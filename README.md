@@ -1,6 +1,6 @@
 # Google Migration Center Pricing to Google Sheets
 
-This application will automatically create a Google Sheets a from Migration Center generated pricing report.
+This application will automatically create a Google Sheets from a Migration Center generated pricing report.
 
 
 ---
