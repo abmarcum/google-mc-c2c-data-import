@@ -552,9 +552,9 @@ def import_mc_data(mc_reports_directory, spreadsheet, credentials):
     unmapped_csv_num_rows = len(mc_data["unmapped"]) + 1
 
     # Create pivot table of GCP Services & Total cost for each
-    rows_column_offset = 4  # Data, Column E
-    values_column_offset = 22  # Data, Column W, GCP Cost
-    values_column_offset_2nd = 18  # Data, Column S, AWS Cost
+    rows_column_offset = 5  # Data, Column F
+    values_column_offset = 23  # Data, Column X, GCP Cost
+    values_column_offset_2nd = 19  # Data, Column T, AWS Cost
     location_data = [0, 0]  # Cell: Column A, Row 1
     res = spreadsheet.batch_update(
         generate_pivot_table_request_sum(mapped_worksheet_id.id, overview_worksheet_id, mapped_csv_header_length,
