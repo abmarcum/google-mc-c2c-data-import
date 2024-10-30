@@ -289,7 +289,7 @@ def generate_pivot_table_request_sum(data_spreadsheet, location_spreadsheet, las
 # Create Pivot table with counts for Google Sheets
 def generate_pivot_table_request_count(data_spreadsheet, location_spreadsheet, last_data_column, last_data_row,
                                        location_data,
-                                       rows_column_offset, second_rows_column_offset, values_column_offset):
+                                       rows_column_offset, second_rows_column_offset, values_column_offset, show_totals):
     # Google Sheets Pivot Table API: https://developers.google.com/sheets/api/samples/pivot-tables
 
     # If 2nd rows for Pivot Table is empty, don't include it. Otherwise, do include.
@@ -313,7 +313,7 @@ def generate_pivot_table_request_count(data_spreadsheet, location_spreadsheet, l
                                             'rows': [
                                                 {
                                                     'sourceColumnOffset': rows_column_offset,
-                                                    'showTotals': True,
+                                                    'showTotals': show_totals,
                                                     "sortOrder": "DESCENDING",
                                                     "valueBucket": { }
                                                 }
@@ -361,7 +361,7 @@ def generate_pivot_table_request_count(data_spreadsheet, location_spreadsheet, l
                                             'rows': [
                                                 {
                                                     'sourceColumnOffset': rows_column_offset,
-                                                    'showTotals': True,
+                                                    'showTotals': show_totals,
                                                     "sortOrder": "DESCENDING",
                                                     "valueBucket": {}
                                                 },
@@ -562,13 +562,13 @@ def import_mc_data(mc_reports_directory, spreadsheet, credentials):
                                          rows_column_offset, None, values_column_offset, values_column_offset_2nd))
 
     # Create pivot table of GCP Machine types & totals for each
-    rows_column_offset = 8  # Data, Column I
-    values_column_offset = 7  # Data, Column H
+    rows_column_offset = 10  # Data, Column K
+    values_column_offset = 10  # Data, Column K
     location_data = [4, 0]  # Cell: Column E, Row 1
     res = spreadsheet.batch_update(
         generate_pivot_table_request_count(mapped_worksheet_id.id, overview_worksheet_id, mapped_csv_header_length,
                                            mapped_csv_num_rows, location_data,
-                                           rows_column_offset, 7, values_column_offset))
+                                           7, rows_column_offset, values_column_offset, False))
     # Add Piechart of GCP Machine types in GCP Overview
     chart_title = "GCP Instance Breakdown"
     first_column = 5  # Col F
