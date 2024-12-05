@@ -21,10 +21,12 @@
 #################################################################
 
 import pandas as pd
+import pytz
 import gspread
 import csv
 import datetime
 from oauth2client.service_account import ServiceAccountCredentials
+from google.cloud import bigquery
 import google.auth
 from gspread_formatting import *
 import argparse
@@ -47,6 +49,36 @@ mc_names = {
     "discount": "Discounts"
 }
 
+mc_column_names = {
+    "mapped": ["ID", "Item Type", "Account Or Subscription", "Source Product", "Source Product Name", "GCP Service",
+               "Description", "Region", "Source Shape", "Destination Series", "Destination Shape", "Type", "Sub Type 1",
+               "Sub Type 2", "vCPUs", "Memory - GB", "External Memory - GB", "Quantity", "Quantity Type", "Source Cost",
+               "Source Currency", "Infra Cost", "OS Licenses Cost", "GCP Cost", "GCP Currency", "Warning",
+               "Warning Messages"],
+    "unmapped": ["identity_LineItemId", "lineItem_LineItemType", "lineItem_ProductCode", "lineItem_ProductName",
+                 "lineItem_UsageType", "lineItem_Operation", "lineItem_ResourceId", "lineItem_UsageAmount",
+                 "lineItem_CurrencyCode", "lineItem_UnblendedRate", "lineItem_UnblendedCost",
+                 "lineItem_LineItemDescription", "Error", "ErrorMessage"],
+    # "source-merged": [""],,
+    # "tax": [""],,
+    "discount": ["identity_LineItemId", "lineItem_LineItemType", "lineItem_ProductCode", "lineItem_ProductName",
+                 "lineItem_UsageType", "lineItem_Operation", "lineItem_ResourceId", "lineItem_UsageAmount",
+                 "lineItem_CurrencyCode", "lineItem_UnblendedRate", "lineItem_UnblendedCost",
+                 "lineItem_LineItemDescription", "Error", "ErrorMessage"]
+}
+
+mc_column_datatypes = {
+    "mapped": ["STRING", "STRING", "INT64", "STRING", "STRING", "STRING", "STRING", "STRING", "STRING", "STRING",
+               "STRING", "STRING", "STRING", "STRING", "INT64", "INT64", "INT64", "NUMERIC", "STRING", "NUMERIC",
+               "STRING", "NUMERIC", "NUMERIC", "NUMERIC", "STRING", "STRING", "STRING"],
+    "unmapped": ["STRING", "STRING", "STRING", "STRING", "STRING", "STRING", "STRING", "NUMERIC", "STRING", "NUMERIC",
+                 "NUMERIC", "STRING", "STRING", "STRING"],
+    # "source-merged": [""],,
+    # "tax": [""],,
+    "discount": ["STRING", "STRING", "STRING", "STRING", "STRING", "STRING", "STRING", "NUMERIC", "STRING", "NUMERIC",
+                 "NUMERIC", "STRING", "STRING", "STRING"],
+}
+
 
 # Check number of rows & columns in CSV file
 def check_csv_size(mc_reports_directory):
@@ -67,11 +99,13 @@ def check_csv_size(mc_reports_directory):
 
                 total_cells = number_of_rows * number_of_columns
                 if total_cells > 5000000:
-                    print(file + " exceeds the 5 million cell Google Sheets limit (" + str(total_cells) + ") and therefor cannot be imported through the Google Sheets API. A workaround is to import the pricing reports into Biq Query manually and connecting a Google Sheet through the Biq Query Connector. Exiting now due to Google Sheets size limitations.")
+                    print(file + " exceeds the 5 million cell Google Sheets limit (" + str(
+                        total_cells) + ") and therefor cannot be imported through the Google Sheets API. A workaround is to import the pricing reports into Biq Query manually and connecting a Google Sheet through the Biq Query Connector. Exiting now due to Google Sheets size limitations.")
                     exit()
     else:
         print("No CSV files found in " + mc_reports_directory + "! Exiting!")
         exit()
+
 
 # Create Initial Google Sheets
 def create_google_sheets(customer_name, sheets_email_addresses, service_account_key, sheets_id):
@@ -84,23 +118,25 @@ def create_google_sheets(customer_name, sheets_email_addresses, service_account_
     sheets_title = ("Migration Center Pricing Report: " + customer_name + ' - ' + datetime)
 
     # Use provided Google Service Account Key, otherwise try to use gcloud auth key to authenticate
-    if service_account_key != "":
-        try:
-            credentials = ServiceAccountCredentials.from_json_keyfile_name(service_account_key, scope)
-        except IOError:
-            print("Google Service account key: " + service_account_key + " does not appear to exist! Exiting...")
-            exit()
-    else:
-        if "GOOGLE_APPLICATION_CREDENTIALS" not in os.environ:
-            os.environ[
-                "GOOGLE_APPLICATION_CREDENTIALS"] = (os.path.expanduser(
-                '~' + username) + "/.config/gcloud/application_default_credentials.json")
 
-        try:
-            credentials, _ = google.auth.default(scopes=scope)
-        except:
-            print("Unable to auth against Google...")
-            exit()
+    credentials = google_auth(service_account_key, scope)
+    # if service_account_key != "":
+    #     try:
+    #         credentials = ServiceAccountCredentials.from_json_keyfile_name(service_account_key, scope)
+    #     except IOError:
+    #         print("Google Service account key: " + service_account_key + " does not appear to exist! Exiting...")
+    #         exit()
+    # else:
+    #     if "GOOGLE_APPLICATION_CREDENTIALS" not in os.environ:
+    #         os.environ[
+    #             "GOOGLE_APPLICATION_CREDENTIALS"] = (os.path.expanduser(
+    #             '~' + username) + "/.config/gcloud/application_default_credentials.json")
+    #
+    #     try:
+    #         credentials, _ = google.auth.default(scopes=scope)
+    #     except:
+    #         print("Unable to auth against Google...")
+    #         exit()
 
     client = gspread.authorize(credentials)
 
@@ -122,7 +158,8 @@ def create_google_sheets(customer_name, sheets_email_addresses, service_account_
 # Create Pivot table with sums for Google Sheets
 def generate_pivot_table_request_sum(data_spreadsheet, location_spreadsheet, last_data_column, last_data_row,
                                      location_data,
-                                     rows_column_offset, second_rows_column_offset, values_column_offset, values_column_offset_2nd):
+                                     rows_column_offset, second_rows_column_offset, values_column_offset,
+                                     values_column_offset_2nd):
     # Google Sheets Pivot Table API: https://developers.google.com/sheets/api/samples/pivot-tables
 
     # If 2nd rows for Pivot Table is empty, don't include it. Otherwise, do include.
@@ -289,7 +326,8 @@ def generate_pivot_table_request_sum(data_spreadsheet, location_spreadsheet, las
 # Create Pivot table with counts for Google Sheets
 def generate_pivot_table_request_count(data_spreadsheet, location_spreadsheet, last_data_column, last_data_row,
                                        location_data,
-                                       rows_column_offset, second_rows_column_offset, values_column_offset, show_totals):
+                                       rows_column_offset, second_rows_column_offset, values_column_offset,
+                                       show_totals):
     # Google Sheets Pivot Table API: https://developers.google.com/sheets/api/samples/pivot-tables
 
     # If 2nd rows for Pivot Table is empty, don't include it. Otherwise, do include.
@@ -315,7 +353,7 @@ def generate_pivot_table_request_count(data_spreadsheet, location_spreadsheet, l
                                                     'sourceColumnOffset': rows_column_offset,
                                                     'showTotals': show_totals,
                                                     "sortOrder": "DESCENDING",
-                                                    "valueBucket": { }
+                                                    "valueBucket": {}
                                                 }
                                             ],
                                             'values': [
@@ -398,8 +436,8 @@ def generate_pivot_table_request_count(data_spreadsheet, location_spreadsheet, l
 
     return pivot_table_body
 
-def generate_pie_table_request(spreadsheet, chart_title, first_column, second_column, position_data):
 
+def generate_pie_table_request(spreadsheet, chart_title, first_column, second_column, position_data):
     # Google Sheets Charts API: https://developers.google.com/sheets/api/samples/charts
 
     pie_chart_body = {
@@ -453,6 +491,7 @@ def generate_pie_table_request(spreadsheet, chart_title, first_column, second_co
         ]
     }
     return pie_chart_body
+
 
 def autosize_worksheet(sheet_id, first_col, last_col):
     # Autoresize Worksheet - Body values
@@ -579,7 +618,8 @@ def import_mc_data(mc_reports_directory, spreadsheet, credentials):
         0  # Row 1
     ]
 
-    res = spreadsheet.batch_update(generate_pie_table_request(overview_worksheet_id, chart_title, first_column, second_column, position_data))
+    res = spreadsheet.batch_update(
+        generate_pie_table_request(overview_worksheet_id, chart_title, first_column, second_column, position_data))
 
     # Autosize first cols in GCP Overview worksheet
     first_col = 0
@@ -588,20 +628,21 @@ def import_mc_data(mc_reports_directory, spreadsheet, credentials):
 
     # Change AWS Cost Totals to Currency format
     overview_worksheet.format("B", {
-                            "numberFormat": {"type": "CURRENCY"}
-                        })
+        "numberFormat": {"type": "CURRENCY"}
+    })
     # Change GCP Cost Totals to Currency format
     overview_worksheet.format("C", {
-                            "numberFormat": {"type": "CURRENCY"}
-                        })
+        "numberFormat": {"type": "CURRENCY"}
+    })
 
     # Create pivot table of Unmapped Services & Total cost for each
     rows_column_offset = 2  # Data, Column C
     values_column_offset = 9  # Data, Column V
-    values_column_offset_2nd = 0 # Ignore
+    values_column_offset_2nd = 0  # Ignore
     location_data = [0, 0]  # Cell: Column A, Row 1
     res = spreadsheet.batch_update(
-        generate_pivot_table_request_sum(unmapped_worksheet_id.id, unmapped_overview_worksheet_id, unmapped_csv_header_length,
+        generate_pivot_table_request_sum(unmapped_worksheet_id.id, unmapped_overview_worksheet_id,
+                                         unmapped_csv_header_length,
                                          unmapped_csv_num_rows, location_data,
                                          rows_column_offset, None, values_column_offset, values_column_offset_2nd))
 
@@ -616,7 +657,8 @@ def import_mc_data(mc_reports_directory, spreadsheet, credentials):
     ]
 
     res = spreadsheet.batch_update(
-        generate_pie_table_request(unmapped_overview_worksheet.id, chart_title, first_column, second_column, position_data))
+        generate_pie_table_request(unmapped_overview_worksheet.id, chart_title, first_column, second_column,
+                                   position_data))
 
     # Change Unmapped Cost Totals to Currency format
     unmapped_overview_worksheet.format("B", {
@@ -632,9 +674,113 @@ def import_mc_data(mc_reports_directory, spreadsheet, credentials):
     spreadsheet.reorder_worksheets(mc_names_list)
 
 
+def google_auth(service_account_key, scope):
+    # Use provided Google Service Account Key, otherwise try to use gcloud auth key to authenticate
+    if service_account_key != "":
+        try:
+            credentials = ServiceAccountCredentials.from_json_keyfile_name(service_account_key, scope)
+        except IOError:
+            print("Google Service account key: " + service_account_key + " does not appear to exist! Exiting...")
+            exit()
+    else:
+        if "GOOGLE_APPLICATION_CREDENTIALS" not in os.environ:
+            os.environ[
+                "GOOGLE_APPLICATION_CREDENTIALS"] = (os.path.expanduser(
+                '~' + username) + "/.config/gcloud/application_default_credentials.json")
+
+        try:
+            credentials, _ = google.auth.default(scopes=scope)
+        except:
+            print("Unable to auth against Google...")
+            exit()
+    return credentials
+
+
+def import_mc_into_bq(mc_reports_directory, bq_dataset_name, bq_table_prefix, service_account_key):
+    gcp_project_id = "amarcum-argolis-pricing-ewuu3b"
+    # GCP Scope for auth
+    scope = [
+        "https://www.googleapis.com/auth/drive",
+        "https://www.googleapis.com/auth/cloud-platform",
+    ]
+
+    #Google Auth
+    credentials = google_auth(service_account_key, scope)
+    client = gspread.authorize(credentials)
+
+    # Construct a BigQuery client object.
+    client = bigquery.Client()
+
+    mc_data = {}
+    # Grabbing a list of files from the provided mc directory
+    try:
+        mc_file_list = os.listdir(mc_reports_directory)
+        print("Importing pricing report files...")
+    except:
+        print("Unable to access directory: " + mc_reports_directory)
+        exit()
+
+    # Importing all CSV files into a dictionary of dataframes
+    for file in mc_file_list:
+        bq_table_name = (f"{bq_table_prefix}{file.replace('.csv', '')}")
+        table_id = (f"{gcp_project_id}.{bq_dataset_name}.{bq_table_name}")
+        print(f"Importing {file} into BQ Table: {table_id}")
+        if file.endswith(".csv"):
+            file_fullpath = (mc_reports_directory + "/" + file)
+            file_name, _ = file.rsplit(".csv")
+            sheet_name = mc_names[file_name]
+            mc_data[file_name] = pd.read_csv(file_fullpath)
+
+            dataframe = pd.DataFrame(
+                mc_data[file_name],
+                # In the loaded table, the column order reflects the order of the
+                # columns in the DataFrame.
+                columns=mc_column_names[file_name]
+            )
+
+            # print(dataframe)
+            # schema = []
+            # col_count = 0
+            # Create Schema Fields for BQ
+            # for column in mc_column_names[file_name]:
+            #     if mc_column_datatypes[file_name][col_count] == 'STRING':
+            #         schema.append(bigquery.SchemaField(column, bigquery.enums.SqlTypeNames.STRING))
+            #     elif mc_column_datatypes[file_name][col_count] == 'NUMERIC':
+            #         schema.append(bigquery.SchemaField(column, bigquery.enums.SqlTypeNames.NUMERIC))
+            #
+            #     col_count += 1
+
+            #print(schema)
+            job_config = bigquery.LoadJobConfig(
+                # Specify a (partial) schema. All columns are always written to the
+                # table. The schema is used to assist in data type definitions.
+                # schema=schema,
+                # Optionally, set the write disposition. BigQuery appends loaded rows
+                # to an existing table by default, but with WRITE_TRUNCATE write
+                # disposition it replaces the table with the loaded data.
+                autodetect=True,
+                write_disposition=bigquery.WriteDisposition.WRITE_TRUNCATE,
+                create_disposition=bigquery.CreateDisposition.CREATE_IF_NEEDED,
+                column_name_character_map="V2",
+                source_format=bigquery.SourceFormat.CSV
+            )
+
+            job = client.load_table_from_dataframe(
+                mc_data[file_name], table_id, job_config=job_config
+            )  # Make an API request.
+            job.result()  # Wait for the job to complete.
+
+            table = client.get_table(table_id)  # Make an API request.
+            print(
+                "Loaded {} rows and {} columns to {}".format(
+                    table.num_rows, len(table.schema), table_id
+                )
+            )
+
+
 # Parse CLI Arguments
 def parse_cli_args():
-    parser = argparse.ArgumentParser(prog='mc-to-sheets.py',
+    parser = argparse.ArgumentParser(prog='google-mc-sheets.py',
                                      usage='%(prog)s -d <mc report directory> ./\nThis creates an instance mapping between cloud providers and GCP')
     parser.add_argument('-d', metavar='Migration Center Pricing Reports Directory',
                         help='Directory containing mc report output. Contains mapped.csv, unmapped.csv, etc',
@@ -647,6 +793,12 @@ def parse_cli_args():
                         help='Use existing Google Sheets instead of creating a new one. Takes Sheets ID')
     parser.add_argument('-k', metavar='SA JSON Keyfile', required=False,
                         help='Google Service Account JSON Key File. Both Drive & Sheets API in GCP Project must be enabled! ')
+    parser.add_argument('-b', action='store_true', required=False,
+                        help='Import Migration Center CSV files into Biq Query Dataset. GCP BQ API must be enabled! ')
+    parser.add_argument('-n', metavar='BQ Dataset Name', required=False,
+                        help='Biq Query Dataset Name. Default dataset name is \'mc_import_dataset\'.')
+    parser.add_argument('-t', metavar='BQ Table Prefix', required=False,
+                        help='Biq Query Table Name. Default table prefix is \'mc_import_\'.')
     return parser.parse_args()
 
 
@@ -654,6 +806,7 @@ def main():
     args = parse_cli_args()
 
     mc_reports_directory = args.d
+    enable_bq_import = args.b
 
     print("Migration Center Pricing Report to Google sheets, v0.1")
 
@@ -670,35 +823,59 @@ def main():
         print("Migration Center Reports directory not defined, exiting!")
         exit()
 
-    check_csv_size(mc_reports_directory)
+    if enable_bq_import is not True:
+        check_csv_size(mc_reports_directory)
 
-    if args.e is not None:
-        sheets_emails = args.e
-        sheets_email_addresses = sheets_emails.split(",")
-        print("Sharing Sheets with: ")
-        for email in sheets_email_addresses:
-            print(email)
+        if args.e is not None:
+            sheets_emails = args.e
+            sheets_email_addresses = sheets_emails.split(",")
+            print("Sharing Sheets with: ")
+            for email in sheets_email_addresses:
+                print(email)
+        else:
+            sheets_email_addresses = ""
+
+        if args.k is not None:
+            service_account_key = args.k
+            print("Using Google Service Account key: " + service_account_key)
+        else:
+            service_account_key = ""
+
+        if args.s is not None:
+            sheets_id = args.s
+        else:
+            sheets_id = ""
+
+        spreadsheet, credentials = create_google_sheets(customer_name, sheets_email_addresses, service_account_key,
+                                                        sheets_id)
+
+        import_mc_data(mc_reports_directory, spreadsheet, credentials)
+
+        spreadsheet_url = "https://docs.google.com/spreadsheets/d/%s" % spreadsheet.id
+        print("Migration Center Pricing Report for " + customer_name + ": " + spreadsheet_url)
     else:
-        sheets_email_addresses = ""
+        print("Importing Migration Center data into Big Query...")
 
-    if args.k is not None:
-        service_account_key = args.k
-        print("Using Google Service Account key: " + service_account_key)
-    else:
-        service_account_key = ""
+        if args.n is not None:
+            bq_dataset_name = args.n
+        else:
+            bq_dataset_name = "mc_import_dataset"
 
-    if args.s is not None:
-        sheets_id = args.s
-    else:
-        sheets_id = ""
+        if args.t is not None:
+            bq_table_prefix = args.t
+        else:
+            bq_table_prefix = "mc_import_"
 
-    spreadsheet, credentials = create_google_sheets(customer_name, sheets_email_addresses, service_account_key,
-                                                    sheets_id)
+        if args.k is not None:
+            service_account_key = args.k
+            print("Using Google Service Account key: " + service_account_key)
+        else:
+            service_account_key = ""
 
-    import_mc_data(mc_reports_directory, spreadsheet, credentials)
+        print(f"BQ Dataset Name: {bq_dataset_name}")
+        print(f"BQ Table Prefix: {bq_table_prefix}")
 
-    spreadsheet_url = "https://docs.google.com/spreadsheets/d/%s" % spreadsheet.id
-    print("Migration Center Pricing Report for " + customer_name + ": " + spreadsheet_url)
+        import_mc_into_bq(mc_reports_directory, bq_dataset_name, bq_table_prefix, service_account_key)
 
 
 if __name__ == "__main__":
