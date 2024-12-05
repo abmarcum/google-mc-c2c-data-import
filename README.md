@@ -2,6 +2,8 @@
 
 This application will automatically create a Google Sheets from a Migration Center generated pricing report.
 
+** NOTE ** - Google Sheets has a limitation of 5 million cells and this size limit prevents the import of large (multi-gigabyte) Migration Center pricing reports. A work-around is to import the pricing reports into Big Query and connect a Google Sheet through the Biq Query connector. 
+
 
 ---
 ### Google Cloud SDK
