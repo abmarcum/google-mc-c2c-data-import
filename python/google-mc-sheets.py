@@ -67,7 +67,7 @@ def check_csv_size(mc_reports_directory):
 
                 total_cells = number_of_rows * number_of_columns
                 if total_cells > 5000000:
-                    print(file + " exceeds the 5m cell Google sheets limit (" + str(total_cells) + "). You must import into Big Query in order to use this dataset in Google Sheets. Exiting!")
+                    print(file + " exceeds the 5 million cell Google Sheets limit (" + str(total_cells) + ") and therefor cannot be imported through the Google Sheets API. A workaround is to import the pricing reports into Biq Query manually and connecting a Google Sheet through the Biq Query Connector. Exiting now due to Google Sheets size limitations.")
                     exit()
     else:
         print("No CSV files found in " + mc_reports_directory + "! Exiting!")
