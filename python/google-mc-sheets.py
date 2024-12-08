@@ -114,7 +114,7 @@ def check_csv_size(mc_reports_directory):
                 total_cells = number_of_rows * number_of_columns
                 if total_cells > 5000000:
                     print(file + " exceeds the 5 million cell Google Sheets limit (" + str(
-                        total_cells) + ") and therefor cannot be imported through the Google Sheets API. A workaround is to import the pricing reports into Biq Query manually and connecting a Google Sheet through the Biq Query Connector. Exiting now due to Google Sheets size limitations.")
+                        total_cells) + ") and therefor cannot be imported through the Google Sheets API. Consider using the -b argument to import into Big Query instead. NOTE: Google Sheets will not be created with the -b option. Exiting now due to Google Sheets size limitations.")
                     exit()
     else:
         print("No CSV files found in " + mc_reports_directory + "! Exiting!")
@@ -817,8 +817,8 @@ def import_mc_into_bq(mc_reports_directory, bq_dataset_name, bq_table_prefix, se
 # Parse CLI Arguments
 def parse_cli_args():
     parser = argparse.ArgumentParser(prog='google-mc-sheets.py',
-                                     usage='%(prog)s -d <mc report directory> ./\nThis creates an instance mapping between cloud providers and GCP')
-    parser.add_argument('-d', metavar='Migration Center Pricing Reports Directory',
+                                     usage='%(prog)s -d <mc report directory>\nThis creates an instance mapping between cloud providers and GCP')
+    parser.add_argument('-d', metavar='MC Data Directory',
                         help='Directory containing mc report output. Contains mapped.csv, unmapped.csv, etc',
                         required=True, )
     parser.add_argument('-c', metavar='Customer Name', help='Customer Name',
@@ -891,7 +891,11 @@ def main():
         print("Migration Center Pricing Report for " + customer_name + ": " + spreadsheet_url)
     else:
         print("Importing Migration Center data into Big Query...")
-
+        print("IMPORTANT: All Big Query tables will be REPLACED! Please Ctrl-C in the next 5 seconds if you wish to abort.")
+        time.sleep(5)
+        print("NOTE: Using this option will NOT automatically create a Google Sheets with your Migration Center Data.")
+        print("Once the BQ import is complete, you will need to manually connect a Google Sheets to the Big Query tables using 'Data' -> 'Data Connectors' -> 'Connect to Biq Query'.")
+        print("Complete Data Connector instructions can be found here: https://support.google.com/docs/answer/9702507")
         if args.n is not None:
             bq_dataset_name = args.n
         else:
