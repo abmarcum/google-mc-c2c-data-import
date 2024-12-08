@@ -134,23 +134,6 @@ def create_google_sheets(customer_name, sheets_email_addresses, service_account_
     # Use provided Google Service Account Key, otherwise try to use gcloud auth key to authenticate
 
     credentials = google_auth(service_account_key, scope)
-    # if service_account_key != "":
-    #     try:
-    #         credentials = ServiceAccountCredentials.from_json_keyfile_name(service_account_key, scope)
-    #     except IOError:
-    #         print("Google Service account key: " + service_account_key + " does not appear to exist! Exiting...")
-    #         exit()
-    # else:
-    #     if "GOOGLE_APPLICATION_CREDENTIALS" not in os.environ:
-    #         os.environ[
-    #             "GOOGLE_APPLICATION_CREDENTIALS"] = (os.path.expanduser(
-    #             '~' + username) + "/.config/gcloud/application_default_credentials.json")
-    #
-    #     try:
-    #         credentials, _ = google.auth.default(scopes=scope)
-    #     except:
-    #         print("Unable to auth against Google...")
-    #         exit()
 
     client = gspread.authorize(credentials)
 
@@ -558,8 +541,6 @@ def import_mc_data(mc_reports_directory, spreadsheet, credentials):
                 params={'valueInputOption': 'USER_ENTERED'},
                 body={'values': list(csv.reader(open(file_fullpath)))})
 
-            # mc_df[file.rstrip('.csv')] = pd.read_csv(file_fullpath, index_col=None, low_memory=False)
-
     # Delete default worksheet
     worksheet = sh.worksheet("Sheet1")
     sh.del_worksheet(worksheet)
@@ -806,14 +787,8 @@ def import_mc_into_bq(mc_reports_directory, bq_dataset_name, bq_table_prefix, se
 
                 col_count += 1
 
-            #print(schema)
             job_config = bigquery.LoadJobConfig(
-                # Specify a (partial) schema. All columns are always written to the
-                # table. The schema is used to assist in data type definitions.
-                # schema=schema,
-                # Optionally, set the write disposition. BigQuery appends loaded rows
-                # to an existing table by default, but with WRITE_TRUNCATE write
-                # disposition it replaces the table with the loaded data.
+
                 autodetect=True,
                 skip_leading_rows=1,
                 write_disposition=bigquery.WriteDisposition.WRITE_TRUNCATE,
@@ -837,6 +812,7 @@ def import_mc_into_bq(mc_reports_directory, bq_dataset_name, bq_table_prefix, se
             )
 
     print("Completed loading of Migration Center Data into Big Query.")
+
 
 # Parse CLI Arguments
 def parse_cli_args():
