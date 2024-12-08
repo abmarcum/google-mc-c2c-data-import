@@ -15,7 +15,7 @@
 #
 # Migration Pricing Reports to Google Sheets
 
-# v0.1
+# v0.2
 # Google
 # amarcum@google.com
 #################################################################
@@ -34,6 +34,7 @@ import time
 import re
 import os
 
+version = "v0.2"
 datetime = str(datetime.datetime.now().strftime("%Y-%m-%d %H:%M"))
 username = os.environ['USER']
 if username == 'root':
@@ -51,32 +52,45 @@ mc_names = {
 
 mc_column_names = {
     "mapped": ["ID", "Item Type", "Account Or Subscription", "Source Product", "Source Product Name", "GCP Service",
-               "Description", "Region", "Source Shape", "Destination Series", "Destination Shape", "Type", "Sub Type 1",
-               "Sub Type 2", "vCPUs", "Memory - GB", "External Memory - GB", "Quantity", "Quantity Type", "Source Cost",
-               "Source Currency", "Infra Cost", "OS Licenses Cost", "GCP Cost", "GCP Currency", "Warning",
+               "Description", "Region", "Source Shape", "Dest Series", "Dest Shape", "Type", "Sub-Type 1",
+               "Sub-Type 2", "vCPUs", "Memory GB", "Extended Memory GB", "Quantity", "Quantity Type", "Source Cost",
+               "Source Currency", "Infra Cost", "OS or Licenses Cost", "GCP Cost", "GCP Currency", "Warning",
                "Warning Messages"],
-    "unmapped": ["identity_LineItemId", "lineItem_LineItemType", "lineItem_ProductCode", "lineItem_ProductName",
-                 "lineItem_UsageType", "lineItem_Operation", "lineItem_ResourceId", "lineItem_UsageAmount",
-                 "lineItem_CurrencyCode", "lineItem_UnblendedRate", "lineItem_UnblendedCost",
-                 "lineItem_LineItemDescription", "Error", "ErrorMessage"],
+    "unmapped": ["identity_LineItemId", "lineItem_LineItemType", "lineItem_UsageAccountId", "lineItem_ProductCode",
+                 "product_ProductName", "lineItem_UsageType", "lineItem_Operation", "lineItem_ResourceId",
+                 "lineItem_UsageAmount", "lineItem_CurrencyCode", "lineItem_UnblendedRate", "lineItem_UnblendedCost",
+                 "lineItem_LineItemDescription", "reservation_AmortizedUpfrontFeeForBillingPeriod",
+                 "savingsPlan_AmortizedUpfrontCommitmentForBillingPeriod", "Error", "ErrorMessage"],
+    # "unmapped": ["identity_LineItemId", "lineItem_LineItemType", "lineItem_ProductCode", "lineItem_ProductName",
+    #              "lineItem_UsageType", "lineItem_Operation", "lineItem_ResourceId", "lineItem_UsageAmount",
+    #              "lineItem_CurrencyCode", "lineItem_UnblendedRate", "lineItem_UnblendedCost",
+    #              "lineItem_LineItemDescription", "Error", "ErrorMessage"],
     # "source-merged": [""],,
     # "tax": [""],,
-    "discount": ["identity_LineItemId", "lineItem_LineItemType", "lineItem_ProductCode", "lineItem_ProductName",
-                 "lineItem_UsageType", "lineItem_Operation", "lineItem_ResourceId", "lineItem_UsageAmount",
-                 "lineItem_CurrencyCode", "lineItem_UnblendedRate", "lineItem_UnblendedCost",
-                 "lineItem_LineItemDescription", "Error", "ErrorMessage"]
+    # "discount": ["identity_LineItemId", "lineItem_LineItemType", "lineItem_ProductCode", "lineItem_ProductName",
+    #              "lineItem_UsageType", "lineItem_Operation", "lineItem_ResourceId", "lineItem_UsageAmount",
+    #              "lineItem_CurrencyCode", "lineItem_UnblendedRate", "lineItem_UnblendedCost",
+    #              "lineItem_LineItemDescription", "Error", "ErrorMessage"]
+    "discount": ["identity_LineItemId", "lineItem_LineItemType", "lineItem_UsageAccountId", "lineItem_ProductCode",
+                 "product_ProductName", "lineItem_UsageType", "lineItem_Operation", "lineItem_ResourceId",
+                 "lineItem_UsageAmount", "lineItem_CurrencyCode", "lineItem_UnblendedRate", "lineItem_UnblendedCost",
+                 "lineItem_LineItemDescription", "reservation_AmortizedUpfrontFeeForBillingPeriod",
+                 "savingsPlan_AmortizedUpfrontCommitmentForBillingPeriod", "Error", "ErrorMessage"],
+
 }
 
 mc_column_datatypes = {
-    "mapped": ["STRING", "STRING", "INT64", "STRING", "STRING", "STRING", "STRING", "STRING", "STRING", "STRING",
-               "STRING", "STRING", "STRING", "STRING", "INT64", "INT64", "INT64", "NUMERIC", "STRING", "NUMERIC",
-               "STRING", "NUMERIC", "NUMERIC", "NUMERIC", "STRING", "STRING", "STRING"],
-    "unmapped": ["STRING", "STRING", "STRING", "STRING", "STRING", "STRING", "STRING", "NUMERIC", "STRING", "NUMERIC",
-                 "NUMERIC", "STRING", "STRING", "STRING"],
+    "mapped": ["STRING", "STRING", "STRING", "STRING", "STRING", "STRING", "STRING", "STRING", "STRING", "STRING",
+               "STRING", "STRING", "STRING", "STRING", "FLOAT64", "FLOAT64", "FLOAT64", "FLOAT64", "STRING", "FLOAT64",
+               "STRING", "FLOAT64", "FLOAT64", "FLOAT64", "STRING", "STRING", "STRING"],
+    "unmapped": ["STRING", "STRING", "FLOAT64", "STRING", "STRING", "STRING", "STRING", "STRING", "FLOAT64", "STRING",
+                 "FLOAT64", "FLOAT64", "STRING", "FLOAT64", "FLOAT64", "STRING", "STRING"],
     # "source-merged": [""],,
     # "tax": [""],,
-    "discount": ["STRING", "STRING", "STRING", "STRING", "STRING", "STRING", "STRING", "NUMERIC", "STRING", "NUMERIC",
-                 "NUMERIC", "STRING", "STRING", "STRING"],
+    # "discount": ["STRING", "STRING", "NUMERIC", "STRING", "STRING", "STRING", "STRING", "STRING", "NUMERIC", "STRING",
+    #              "NUMERIC", "NUMERIC", "STRING", "NUMERIC", "NUMERIC", "STRING", "STRING"],
+    "discount": ["STRING", "STRING", "FLOAT64", "STRING", "STRING", "STRING", "STRING", "STRING", "FLOAT64", "STRING",
+                 "FLOAT64", "FLOAT64", "STRING", "FLOAT64", "FLOAT64", "STRING", "STRING"],
 }
 
 
@@ -708,9 +722,6 @@ def import_mc_into_bq(mc_reports_directory, bq_dataset_name, bq_table_prefix, se
     credentials = google_auth(service_account_key, scope)
     client = gspread.authorize(credentials)
 
-    # Construct a BigQuery client object.
-    client = bigquery.Client()
-
     mc_data = {}
     # Grabbing a list of files from the provided mc directory
     try:
@@ -720,16 +731,61 @@ def import_mc_into_bq(mc_reports_directory, bq_dataset_name, bq_table_prefix, se
         print("Unable to access directory: " + mc_reports_directory)
         exit()
 
+    # Create BQ dataset
+    client = bigquery.Client()
+    dataset_id = f"{gcp_project_id}.{bq_dataset_name}"
+
+    # Construct a full Dataset object to send to the API.
+    dataset = bigquery.Dataset(dataset_id)
+
+    try:
+        client.get_dataset(dataset_id)  # Check if dataset exists
+        print(f"Dataset {dataset_id} already exists.")
+    except:
+        dataset.location = "US"
+        dataset = client.create_dataset(dataset, timeout=30)  # Make an API request.
+        print(f"Dataset {dataset_id} created.")
+
     # Importing all CSV files into a dictionary of dataframes
     for file in mc_file_list:
         bq_table_name = (f"{bq_table_prefix}{file.replace('.csv', '')}")
         table_id = (f"{gcp_project_id}.{bq_dataset_name}.{bq_table_name}")
         print(f"Importing {file} into BQ Table: {table_id}")
+        set_gcp_project = f"gcloud config set project {gcp_project_id} >/dev/null 2>&1"
+
+        file_name, _ = file.rsplit(".csv")
+        count = 0
+        schema = ""
+        for column in mc_column_names[file_name]:
+            schema = schema + f"\"{column}\":{mc_column_datatypes[file_name][count]},"
+            count += 1
+
+        # Remove last comma
+        schema = schema[:-1]
+        try:
+            os.system(set_gcp_project)
+        except Exception as e:
+            print(f"error: {e}")
+
         if file.endswith(".csv"):
-            file_fullpath = (mc_reports_directory + "/" + file)
+            file_fullpath = (mc_reports_directory + "" + file)
+
+            # # Having to use bq load CLI due to apparent bug in python BQ library
+            # bq_cli_load_command = f"bq load --autodetect --skip_leading_rows=1 --allow_quoted_newlines --column_name_character_map=V2 --source_format=CSV --replace=true {bq_dataset_name}.{bq_table_name} {file_fullpath} {schema}"
+            # # print(bq_cli_load_command)
+            # try:
+            #     os.system(bq_cli_load_command)
+            #     print("Completed.")
+            # except Exception as e:
+            #     print(f"error: {e}")
+            #     exit()
+
+            # Apparent bug with python BQ library not recognizing column character map options - having to create schema file manually
             file_name, _ = file.rsplit(".csv")
             sheet_name = mc_names[file_name]
-            mc_data[file_name] = pd.read_csv(file_fullpath)
+            mc_data[file_name] = pd.read_csv(file_fullpath, low_memory=False)
+            # Replacing ( & ) in column names since BQ doesn't like them & the python library "column character map" version doesn't appear to work.
+            # mc_data[file_name].loc[0] = mc_data[file_name].loc[0].replace('(', '').replace(')', '')
 
             dataframe = pd.DataFrame(
                 mc_data[file_name],
@@ -739,16 +795,16 @@ def import_mc_into_bq(mc_reports_directory, bq_dataset_name, bq_table_prefix, se
             )
 
             # print(dataframe)
-            # schema = []
-            # col_count = 0
+            schema = []
+            col_count = 0
             # Create Schema Fields for BQ
-            # for column in mc_column_names[file_name]:
-            #     if mc_column_datatypes[file_name][col_count] == 'STRING':
-            #         schema.append(bigquery.SchemaField(column, bigquery.enums.SqlTypeNames.STRING))
-            #     elif mc_column_datatypes[file_name][col_count] == 'NUMERIC':
-            #         schema.append(bigquery.SchemaField(column, bigquery.enums.SqlTypeNames.NUMERIC))
-            #
-            #     col_count += 1
+            for column in mc_column_names[file_name]:
+                if mc_column_datatypes[file_name][col_count] == 'STRING':
+                    schema.append(bigquery.SchemaField(column, bigquery.enums.SqlTypeNames.STRING))
+                elif mc_column_datatypes[file_name][col_count] == 'FLOAT64':
+                    schema.append(bigquery.SchemaField(column, bigquery.enums.SqlTypeNames.FLOAT64))
+
+                col_count += 1
 
             #print(schema)
             job_config = bigquery.LoadJobConfig(
@@ -759,9 +815,12 @@ def import_mc_into_bq(mc_reports_directory, bq_dataset_name, bq_table_prefix, se
                 # to an existing table by default, but with WRITE_TRUNCATE write
                 # disposition it replaces the table with the loaded data.
                 autodetect=True,
+                skip_leading_rows=1,
                 write_disposition=bigquery.WriteDisposition.WRITE_TRUNCATE,
                 create_disposition=bigquery.CreateDisposition.CREATE_IF_NEEDED,
                 column_name_character_map="V2",
+                quote_character="",
+                schema=schema,
                 source_format=bigquery.SourceFormat.CSV
             )
 
@@ -777,6 +836,7 @@ def import_mc_into_bq(mc_reports_directory, bq_dataset_name, bq_table_prefix, se
                 )
             )
 
+    print("Completed loading of Migration Center Data into Big Query.")
 
 # Parse CLI Arguments
 def parse_cli_args():
@@ -808,7 +868,7 @@ def main():
     mc_reports_directory = args.d
     enable_bq_import = args.b
 
-    print("Migration Center Pricing Report to Google sheets, v0.1")
+    print(f"Migration Center Pricing Report to Google sheets, {version}")
 
     if args.c is not None:
         customer_name = args.c
