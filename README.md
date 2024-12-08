@@ -5,7 +5,7 @@ This application will automatically create a Google Sheets from a Migration Cent
 **NOTE** - Google Sheets has a limitation of 5 million cells and this size limit prevents the import of large (multi-gigabyte) Migration Center pricing reports. 
 Consider using the -b argument to import the MC data into Big Query instead. However, Google Sheets will not be created with the '-b' option and you must *manually* connect to Biq Query through the Google Sheets Data Connector. 
 
-Further Instuctions on using the Google Sheets Data Connector to Big Query can be found [here](https://support.google.com/docs/answer/9702507).
+Further Instuctions on using the Google Sheets Data Connector with Big Query can be found [here](https://support.google.com/docs/answer/9702507).
 
 
 ---
