@@ -33,6 +33,7 @@ import argparse
 import time
 import re
 import os
+import json
 
 version = "v0.2"
 datetime = str(datetime.datetime.now().strftime("%Y-%m-%d %H:%M"))
@@ -42,57 +43,11 @@ if username == 'root':
     exit()
 
 # Order to sort worksheets and new names to use
-mc_names = {
-    "mapped": "GCP Mapped Data (mapped)",
-    "unmapped": "Unmapped Data (unmapped)",
-    # "source-merged": "Original Data, Merged (source-merged)",
-    # "tax": "Tax",
-    "discount": "Discounts"
-}
-
-mc_column_names = {
-    "mapped": ["ID", "Item Type", "Account Or Subscription", "Source Product", "Source Product Name", "GCP Service",
-               "Description", "Region", "Source Shape", "Dest Series", "Dest Shape", "Type", "Sub-Type 1",
-               "Sub-Type 2", "vCPUs", "Memory GB", "Extended Memory GB", "Quantity", "Quantity Type", "Source Cost",
-               "Source Currency", "Infra Cost", "OS or Licenses Cost", "GCP Cost", "GCP Currency", "Warning",
-               "Warning Messages"],
-    "unmapped": ["identity_LineItemId", "lineItem_LineItemType", "lineItem_UsageAccountId", "lineItem_ProductCode",
-                 "product_ProductName", "lineItem_UsageType", "lineItem_Operation", "lineItem_ResourceId",
-                 "lineItem_UsageAmount", "lineItem_CurrencyCode", "lineItem_UnblendedRate", "lineItem_UnblendedCost",
-                 "lineItem_LineItemDescription", "reservation_AmortizedUpfrontFeeForBillingPeriod",
-                 "savingsPlan_AmortizedUpfrontCommitmentForBillingPeriod", "Error", "ErrorMessage"],
-    # "unmapped": ["identity_LineItemId", "lineItem_LineItemType", "lineItem_ProductCode", "lineItem_ProductName",
-    #              "lineItem_UsageType", "lineItem_Operation", "lineItem_ResourceId", "lineItem_UsageAmount",
-    #              "lineItem_CurrencyCode", "lineItem_UnblendedRate", "lineItem_UnblendedCost",
-    #              "lineItem_LineItemDescription", "Error", "ErrorMessage"],
-    # "source-merged": [""],,
-    # "tax": [""],,
-    # "discount": ["identity_LineItemId", "lineItem_LineItemType", "lineItem_ProductCode", "lineItem_ProductName",
-    #              "lineItem_UsageType", "lineItem_Operation", "lineItem_ResourceId", "lineItem_UsageAmount",
-    #              "lineItem_CurrencyCode", "lineItem_UnblendedRate", "lineItem_UnblendedCost",
-    #              "lineItem_LineItemDescription", "Error", "ErrorMessage"]
-    "discount": ["identity_LineItemId", "lineItem_LineItemType", "lineItem_UsageAccountId", "lineItem_ProductCode",
-                 "product_ProductName", "lineItem_UsageType", "lineItem_Operation", "lineItem_ResourceId",
-                 "lineItem_UsageAmount", "lineItem_CurrencyCode", "lineItem_UnblendedRate", "lineItem_UnblendedCost",
-                 "lineItem_LineItemDescription", "reservation_AmortizedUpfrontFeeForBillingPeriod",
-                 "savingsPlan_AmortizedUpfrontCommitmentForBillingPeriod", "Error", "ErrorMessage"],
-
-}
-
-mc_column_datatypes = {
-    "mapped": ["STRING", "STRING", "STRING", "STRING", "STRING", "STRING", "STRING", "STRING", "STRING", "STRING",
-               "STRING", "STRING", "STRING", "STRING", "FLOAT64", "FLOAT64", "FLOAT64", "FLOAT64", "STRING", "FLOAT64",
-               "STRING", "FLOAT64", "FLOAT64", "FLOAT64", "STRING", "STRING", "STRING"],
-    "unmapped": ["STRING", "STRING", "FLOAT64", "STRING", "STRING", "STRING", "STRING", "STRING", "FLOAT64", "STRING",
-                 "FLOAT64", "FLOAT64", "STRING", "FLOAT64", "FLOAT64", "STRING", "STRING"],
-    # "source-merged": [""],,
-    # "tax": [""],,
-    # "discount": ["STRING", "STRING", "NUMERIC", "STRING", "STRING", "STRING", "STRING", "STRING", "NUMERIC", "STRING",
-    #              "NUMERIC", "NUMERIC", "STRING", "NUMERIC", "NUMERIC", "STRING", "STRING"],
-    "discount": ["STRING", "STRING", "FLOAT64", "STRING", "STRING", "STRING", "STRING", "STRING", "FLOAT64", "STRING",
-                 "FLOAT64", "FLOAT64", "STRING", "FLOAT64", "FLOAT64", "STRING", "STRING"],
-}
-
+f = open('mappings.json',)
+mappings_file = json.load(f)
+mc_names = mappings_file["mc_names"]
+mc_column_names = mappings_file["mc_column_names"]
+f.close()
 
 # Check number of rows & columns in CSV file
 def check_csv_size(mc_reports_directory):
@@ -704,12 +659,20 @@ def import_mc_into_bq(mc_reports_directory, bq_dataset_name, bq_table_prefix, se
     client = gspread.authorize(credentials)
 
     mc_data = {}
+    mc_file_list = []
     # Grabbing a list of files from the provided mc directory
     try:
-        mc_file_list = os.listdir(mc_reports_directory)
         print("Importing pricing report files...")
+        for file in mappings_file["mc_names"].keys():
+            if os.path.isfile(f"{mc_reports_directory}{file}.csv"):
+                mc_file_list.append(f"{file}")
+        # mc_file_list = os.listdir(f"{mc_reports_directory}/*.csv")
     except:
         print("Unable to access directory: " + mc_reports_directory)
+        exit()
+    # Verify MC files exist
+    if len(mc_file_list) != len(mappings_file["mc_names"].keys()):
+        print("Required MC data files do not exist! Exiting!")
         exit()
 
     # Create BQ dataset
@@ -724,7 +687,11 @@ def import_mc_into_bq(mc_reports_directory, bq_dataset_name, bq_table_prefix, se
         print(f"Dataset {dataset_id} already exists.")
     except:
         dataset.location = "US"
-        dataset = client.create_dataset(dataset, timeout=30)  # Make an API request.
+        try:
+            dataset = client.create_dataset(dataset, timeout=30)  # Make an API request.
+        except:
+            print(f"Unable to create dataset: {dataset_id}")
+
         print(f"Dataset {dataset_id} created.")
 
     # Importing all CSV files into a dictionary of dataframes
@@ -734,12 +701,10 @@ def import_mc_into_bq(mc_reports_directory, bq_dataset_name, bq_table_prefix, se
         print(f"Importing {file} into BQ Table: {table_id}")
         set_gcp_project = f"gcloud config set project {gcp_project_id} >/dev/null 2>&1"
 
-        file_name, _ = file.rsplit(".csv")
-        count = 0
+        # file_name, _ = file.rsplit(".csv")
         schema = ""
-        for column in mc_column_names[file_name]:
-            schema = schema + f"\"{column}\":{mc_column_datatypes[file_name][count]},"
-            count += 1
+        for column in mc_column_names[file].keys():
+            schema = schema + f"\"{column}\":{mc_column_names[file][column]},"
 
         # Remove last comma
         schema = schema[:-1]
@@ -748,68 +713,70 @@ def import_mc_into_bq(mc_reports_directory, bq_dataset_name, bq_table_prefix, se
         except Exception as e:
             print(f"error: {e}")
 
-        if file.endswith(".csv"):
-            file_fullpath = (mc_reports_directory + "" + file)
+        # if file.endswith(".csv"):
+        file_fullpath = (f"{mc_reports_directory}{file}.csv")
 
-            # # Having to use bq load CLI due to apparent bug in python BQ library
-            # bq_cli_load_command = f"bq load --autodetect --skip_leading_rows=1 --allow_quoted_newlines --column_name_character_map=V2 --source_format=CSV --replace=true {bq_dataset_name}.{bq_table_name} {file_fullpath} {schema}"
-            # # print(bq_cli_load_command)
-            # try:
-            #     os.system(bq_cli_load_command)
-            #     print("Completed.")
-            # except Exception as e:
-            #     print(f"error: {e}")
-            #     exit()
+        # # Having to use bq load CLI due to apparent bug in python BQ library
+        # bq_cli_load_command = f"bq load --autodetect --skip_leading_rows=1 --allow_quoted_newlines --column_name_character_map=V2 --source_format=CSV --replace=true {bq_dataset_name}.{bq_table_name} {file_fullpath} {schema}"
+        # # print(bq_cli_load_command)
+        # try:
+        #     os.system(bq_cli_load_command)
+        #     print("Completed.")
+        # except Exception as e:
+        #     print(f"error: {e}")
+        #     exit()
 
-            # Apparent bug with python BQ library not recognizing column character map options - having to create schema file manually
-            file_name, _ = file.rsplit(".csv")
-            sheet_name = mc_names[file_name]
-            mc_data[file_name] = pd.read_csv(file_fullpath, low_memory=False)
-            # Replacing ( & ) in column names since BQ doesn't like them & the python library "column character map" version doesn't appear to work.
-            # mc_data[file_name].loc[0] = mc_data[file_name].loc[0].replace('(', '').replace(')', '')
+        # Apparent bug with python BQ library not recognizing column character map options - having to create schema file manually
+        # file_name, _ = file.rsplit(".csv")
+        sheet_name = mc_names[file]
+        mc_data[file] = pd.read_csv(file_fullpath, low_memory=False)
+        # Replacing column names since BQ doesn't like them with () & the python library "column character map" version doesn't appear to work.
+        mc_data[file].rename(columns={"Memory (GB)": "Memory - GB", "External Memory (GB)": "External Memory - GB"}, inplace=True)
 
-            dataframe = pd.DataFrame(
-                mc_data[file_name],
-                # In the loaded table, the column order reflects the order of the
-                # columns in the DataFrame.
-                columns=mc_column_names[file_name]
+        dataframe = pd.DataFrame(
+            mc_data[file],
+            # In the loaded table, the column order reflects the order of the
+            # columns in the DataFrame.
+            columns=mc_column_names[file]
+        )
+
+        schema = []
+        # col_count = 0
+        # Create Schema Fields for BQ
+        for column in mc_column_names[file].keys():
+            if mc_column_names[file][column] == 'STRING':
+                schema.append(bigquery.SchemaField(column, bigquery.enums.SqlTypeNames.STRING))
+            elif mc_column_names[file][column] == 'FLOAT64':
+                schema.append(bigquery.SchemaField(column, bigquery.enums.SqlTypeNames.FLOAT64))
+
+            # col_count += 1
+
+        # print("Schema Length: " + str(len(schema)))
+        # print("DF Cols: " + str(len(mc_column_names[file].keys())))
+        job_config = bigquery.LoadJobConfig(
+
+            autodetect=True,
+            skip_leading_rows=1,
+            write_disposition=bigquery.WriteDisposition.WRITE_TRUNCATE,
+            create_disposition=bigquery.CreateDisposition.CREATE_IF_NEEDED,
+            column_name_character_map="V2",
+            allow_quoted_newlines=True,
+            quote_character="",
+            schema=schema,
+            source_format=bigquery.SourceFormat.CSV
+        )
+
+        job = client.load_table_from_dataframe(
+            mc_data[file], table_id, job_config=job_config
+        )  # Make an API request.
+        job.result()  # Wait for the job to complete.
+
+        table = client.get_table(table_id)  # Make an API request.
+        print(
+            "Loaded {} rows and {} columns to {}".format(
+                table.num_rows, len(table.schema), table_id
             )
-
-            # print(dataframe)
-            schema = []
-            col_count = 0
-            # Create Schema Fields for BQ
-            for column in mc_column_names[file_name]:
-                if mc_column_datatypes[file_name][col_count] == 'STRING':
-                    schema.append(bigquery.SchemaField(column, bigquery.enums.SqlTypeNames.STRING))
-                elif mc_column_datatypes[file_name][col_count] == 'FLOAT64':
-                    schema.append(bigquery.SchemaField(column, bigquery.enums.SqlTypeNames.FLOAT64))
-
-                col_count += 1
-
-            job_config = bigquery.LoadJobConfig(
-
-                autodetect=True,
-                skip_leading_rows=1,
-                write_disposition=bigquery.WriteDisposition.WRITE_TRUNCATE,
-                create_disposition=bigquery.CreateDisposition.CREATE_IF_NEEDED,
-                column_name_character_map="V2",
-                quote_character="",
-                schema=schema,
-                source_format=bigquery.SourceFormat.CSV
-            )
-
-            job = client.load_table_from_dataframe(
-                mc_data[file_name], table_id, job_config=job_config
-            )  # Make an API request.
-            job.result()  # Wait for the job to complete.
-
-            table = client.get_table(table_id)  # Make an API request.
-            print(
-                "Loaded {} rows and {} columns to {}".format(
-                    table.num_rows, len(table.schema), table_id
-                )
-            )
+        )
 
     print("Completed loading of Migration Center Data into Big Query.")
 
@@ -891,10 +858,12 @@ def main():
         print("Migration Center Pricing Report for " + customer_name + ": " + spreadsheet_url)
     else:
         print("Importing Migration Center data into Big Query...")
-        print("IMPORTANT: All Big Query tables will be REPLACED! Please Ctrl-C in the next 5 seconds if you wish to abort.")
+        print(
+            "IMPORTANT: All Big Query tables will be REPLACED! Please Ctrl-C in the next 5 seconds if you wish to abort.")
         time.sleep(5)
         print("NOTE: Using this option will NOT automatically create a Google Sheets with your Migration Center Data.")
-        print("Once the BQ import is complete, you will need to manually connect a Google Sheets to the Big Query tables using 'Data' -> 'Data Connectors' -> 'Connect to Biq Query'.")
+        print(
+            "Once the BQ import is complete, you will need to manually connect a Google Sheets to the Big Query tables using 'Data' -> 'Data Connectors' -> 'Connect to Biq Query'.")
         print("Complete Data Connector instructions can be found here: https://support.google.com/docs/answer/9702507")
         if args.n is not None:
             bq_dataset_name = args.n
