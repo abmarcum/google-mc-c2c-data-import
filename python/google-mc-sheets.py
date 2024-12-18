@@ -724,98 +724,92 @@ def import_mc_into_bq(mc_reports_directory, gcp_project_id, bq_dataset_name, bq_
 
     # Importing all CSV files into a dictionary of dataframes
     for file in mc_file_list:
-        bq_table_name = (f"{bq_table_prefix}{file.replace('.csv', '')}")
-        table_id = (f"{gcp_project_id}.{bq_dataset_name}.{bq_table_name}")
-        print(f"Importing {file} into BQ Table: {table_id}")
-        set_gcp_project = f"gcloud config set project {gcp_project_id} >/dev/null 2>&1"
+        with open(f"{mc_reports_directory}{file}.csv", "rb") as f:
+            num_lines = sum(1 for _ in f)
+        if num_lines > 1:
+            bq_table_name = (f"{bq_table_prefix}{file.replace('.csv', '')}")
+            table_id = (f"{gcp_project_id}.{bq_dataset_name}.{bq_table_name}")
+            print(f"Importing {file}.csv into BQ Table: {table_id}")
+            set_gcp_project = f"gcloud config set project {gcp_project_id} >/dev/null 2>&1"
 
-        # file_name, _ = file.rsplit(".csv")
-        schema = ""
-        for column in mc_column_names[file].keys():
-            schema = schema + f"\"{column}\":{mc_column_names[file][column]},"
+            schema = ""
+            for column in mc_column_names[file].keys():
+                schema = schema + f"\"{column}\":{mc_column_names[file][column]},"
 
-        # Remove last comma
-        schema = schema[:-1]
-        try:
-            os.system(set_gcp_project)
-        except Exception as e:
-            print(f"error: {e}")
+            # Remove last comma
+            schema = schema[:-1]
+            try:
+                os.system(set_gcp_project)
+            except Exception as e:
+                print(f"error: {e}")
 
-        # if file.endswith(".csv"):
-        file_fullpath = (f"{mc_reports_directory}{file}.csv")
+            # if file.endswith(".csv"):
+            file_fullpath = (f"{mc_reports_directory}{file}.csv")
 
-        # # Having to use bq load CLI due to apparent bug in python BQ library
-        # bq_cli_load_command = f"bq load --autodetect --skip_leading_rows=1 --allow_quoted_newlines --column_name_character_map=V2 --source_format=CSV --replace=true {bq_dataset_name}.{bq_table_name} {file_fullpath} {schema}"
-        # # print(bq_cli_load_command)
-        # try:
-        #     os.system(bq_cli_load_command)
-        #     print("Completed.")
-        # except Exception as e:
-        #     print(f"error: {e}")
-        #     exit()
+            sheet_name = mc_names[file]
+            mc_data[file] = pd.read_csv(file_fullpath, low_memory=False)
+            # Replacing column names since BQ doesn't like them with () & the python library "column character map" version doesn't appear to work.
 
-        # Apparent bug with python BQ library not recognizing column character map options - having to create schema file manually
-        # file_name, _ = file.rsplit(".csv")
-        sheet_name = mc_names[file]
-        mc_data[file] = pd.read_csv(file_fullpath, low_memory=False)
-        # Replacing column names since BQ doesn't like them with () & the python library "column character map" version doesn't appear to work.
-        mc_data[file].rename(columns={
-            "Memory (GB)": "Memory_GB",
-            "External Memory (GB)": "External_Memory_GB",
-            "Sub-Type_1": "Sub_Type_1",
-            "Sub-Type_2": "Sub_Type_2",
-            "Dest_Series": "Destination_Series",
-            "Extended_Memory_GB": "External_Memory_GB",
-            "Dest_Shape": "Destination_Shape",
-            "OS_or_Licenses_Cost": "OS_Licenses_Cost"
-        }, inplace=True)
-        mc_data[file].rename(columns=lambda x: x.replace(" ", "_"), inplace=True)
+            # Ensure the various MC & calctl versions have the same column names
+            mc_data[file].rename(columns={
+                "Memory (GB)": "Memory_GB",
+                "External Memory (GB)": "External_Memory_GB",
+                "Sub-Type 1": "Sub_Type_1",
+                "Sub-Type 2": "Sub_Type_2",
+                "Dest Series": "Destination_Series",
+                "Extended Memory GB": "External_Memory_GB",
+                "Dest Shape": "Destination_Shape",
+                "OS or Licenses Cost": "OS_Licenses_Cost"
+            }, inplace=True)
 
-        # print(mc_data[file].columns)
-        dataframe = pd.DataFrame(
-            mc_data[file],
-            # In the loaded table, the column order reflects the order of the
-            # columns in the DataFrame.
-            columns=mc_column_names[file]
-        )
+            # Ensure no spaces exist in any column names
+            mc_data[file].rename(columns=lambda x: x.replace(" ", "_"), inplace=True)
 
-        schema = []
-        # col_count = 0
-        # Create Schema Fields for BQ
-        for column in mc_column_names[file].keys():
-            if mc_column_names[file][column] == 'STRING':
-                schema.append(bigquery.SchemaField(column, bigquery.enums.SqlTypeNames.STRING))
-            elif mc_column_names[file][column] == 'FLOAT64':
-                schema.append(bigquery.SchemaField(column, bigquery.enums.SqlTypeNames.FLOAT64))
+            # More ensuring the various MC & calctl versions have the same column names
+            mc_data[file].rename(columns=lambda x: x.replace("product_", "lineItem_"), inplace=True)
 
-            # col_count += 1
-
-        # print("Schema Length: " + str(len(schema)))
-        # print("DF Cols: " + str(len(mc_column_names[file].keys())))
-        job_config = bigquery.LoadJobConfig(
-
-            autodetect=True,
-            skip_leading_rows=1,
-            write_disposition=bigquery.WriteDisposition.WRITE_TRUNCATE,
-            create_disposition=bigquery.CreateDisposition.CREATE_IF_NEEDED,
-            column_name_character_map="V2",
-            allow_quoted_newlines=True,
-            #quote_character="",
-            schema=schema,
-            source_format=bigquery.SourceFormat.CSV
-        )
-
-        job = client.load_table_from_dataframe(
-            mc_data[file], table_id, job_config=job_config
-        )  # Make an API request.
-        job.result()  # Wait for the job to complete.
-
-        table = client.get_table(table_id)  # Make an API request.
-        print(
-            "Loaded {} rows and {} columns to {}".format(
-                table.num_rows, len(table.schema), table_id
+            dataframe = pd.DataFrame(
+                mc_data[file],
+                # In the loaded table, the column order reflects the order of the
+                # columns in the DataFrame.
+                columns=mc_column_names[file]
             )
-        )
+
+            schema = []
+            # Create Schema Fields for BQ
+            for column in mc_column_names[file].keys():
+                if mc_column_names[file][column] == 'STRING':
+                    schema.append(bigquery.SchemaField(column, bigquery.enums.SqlTypeNames.STRING))
+                elif mc_column_names[file][column] == 'FLOAT64':
+                    schema.append(bigquery.SchemaField(column, bigquery.enums.SqlTypeNames.FLOAT64))
+
+                # col_count += 1
+
+            job_config = bigquery.LoadJobConfig(
+
+                autodetect=True,
+                skip_leading_rows=1,
+                write_disposition=bigquery.WriteDisposition.WRITE_TRUNCATE,
+                create_disposition=bigquery.CreateDisposition.CREATE_IF_NEEDED,
+                column_name_character_map="V2",
+                allow_quoted_newlines=True,
+                schema=schema,
+                source_format=bigquery.SourceFormat.CSV
+            )
+
+            job = client.load_table_from_dataframe(
+                mc_data[file], table_id, job_config=job_config
+            )  # Make an API request.
+            job.result()  # Wait for the job to complete.
+
+            table = client.get_table(table_id)  # Make an API request.
+            print(
+                "Loaded {} rows and {} columns to {}".format(
+                    table.num_rows, len(table.schema), table_id
+                )
+            )
+        else:
+            print(f"Skipping {file}.csv since there is no Migration Center data in the file.")
 
     print("Completed loading of Migration Center Data into Big Query.")
 
@@ -841,8 +835,6 @@ def parse_cli_args():
                         help='Import Migration Center CSV files into Biq Query Dataset. GCP BQ API must be enabled! ')
     parser.add_argument('-i', metavar='BQ Connect Info', required=False,
                         help='BQ Connection Info: Format is <GCP Project ID>.<BQ Dataset Name>.<BQ Table Prefix>, i.e. googleproject.bqdataset.bqtable_prefix')
-    # parser.add_argument('-t', metavar='BQ Table Prefix', required=False,
-    #                     help='Biq Query Table Name. Default table prefix is \'mc_import_\'.')
     return parser.parse_args()
 
 
