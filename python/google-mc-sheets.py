@@ -21,7 +21,7 @@
 #################################################################
 
 import pandas as pd
-import pytz
+import urllib
 import gspread
 import csv
 import datetime
@@ -43,11 +43,12 @@ if username == 'root':
     exit()
 
 # Order to sort worksheets and new names to use
-f = open('mappings.json',)
+f = open('mappings.json', )
 mappings_file = json.load(f)
 mc_names = mappings_file["mc_names"]
 mc_column_names = mappings_file["mc_column_names"]
 f.close()
+
 
 # Check number of rows & columns in CSV file
 def check_csv_size(mc_reports_directory):
@@ -646,8 +647,10 @@ def google_auth(service_account_key, scope):
     return credentials
 
 
-def import_mc_into_bq(mc_reports_directory, bq_dataset_name, bq_table_prefix, service_account_key):
-    gcp_project_id = "amarcum-argolis-pricing-ewuu3b"
+def import_mc_into_bq(mc_reports_directory, gcp_project_id, bq_dataset_name, bq_table_prefix, service_account_key, customer_name):
+    ##CHANGE
+    # gcp_project_id = "amarcum-argolis-pricing-ewuu3b"
+
     # GCP Scope for auth
     scope = [
         "https://www.googleapis.com/auth/drive",
@@ -657,6 +660,30 @@ def import_mc_into_bq(mc_reports_directory, bq_dataset_name, bq_table_prefix, se
     #Google Auth
     credentials = google_auth(service_account_key, scope)
     client = gspread.authorize(credentials)
+
+    # Looker Settings
+    looker_url_prefix = "https://lookerstudio.google.com/reporting/create?c.reportId="
+    looker_template_id = "421c8150-e7ad-4190-b044-6a18ecdbd391"
+    looker_report_name = f"AWS -> GCP Pricing Analysis: {customer_name}, {datetime}"
+    looker_report_name = urllib.parse.quote_plus(looker_report_name)
+
+    looker_ds0_project_id = gcp_project_id  # Mapped BQ Project ID
+    looker_ds0_bq_datasource_name = "mapped"  # Mapped BQ Looker Name
+    looker_ds0_bq_dataset = bq_dataset_name  # Mapped BQ Dataset
+    looker_ds0_bq_table = f"{bq_table_prefix}mapped"  # Mapped BQ Table
+
+    looker_ds1_project_id = gcp_project_id  # Unmapped BQ Project ID
+    looker_ds1_bq_datasource_name = "unmapped"  # Unmapped BQ Looker Name
+    looker_ds1_bq_dataset = bq_dataset_name  # Unmapped BQ Dataset
+    looker_ds1_bq_table = f"{bq_table_prefix}unmapped"  # Unmapped BQ Table
+
+    looker_ds2_project_id = ""  # Discount BQ Project ID
+    looker_ds2_bq_datasource_name = ""  # Discount BQ Looker Name
+    looker_ds2_bq_dataset = ""  # Discount BQ Dataset
+    looker_ds2_bq_table = ""  # Discount BQ Table
+
+    looker_report_url = f"{looker_url_prefix}{looker_template_id}&r.reportName={looker_report_name}&ds.ds0.connector=bigQuery&ds.ds0.datasourceName={looker_ds0_bq_datasource_name}&ds.ds0.projectId={looker_ds0_project_id}&ds.ds0.type=TABLE&ds.ds0.datasetId={looker_ds0_bq_dataset}&ds.ds0.tableId={looker_ds0_bq_table}&ds.ds1.connector=bigQuery&ds.ds1.datasourceName={looker_ds1_bq_datasource_name}&ds.ds1.projectId={looker_ds1_project_id}&ds.ds1.type=TABLE&ds.ds1.datasetId={looker_ds1_bq_dataset}&ds.ds1.tableId={looker_ds1_bq_table}"
+
 
     mc_data = {}
     mc_file_list = []
@@ -691,6 +718,7 @@ def import_mc_into_bq(mc_reports_directory, bq_dataset_name, bq_table_prefix, se
             dataset = client.create_dataset(dataset, timeout=30)  # Make an API request.
         except:
             print(f"Unable to create dataset: {dataset_id}")
+            exit()
 
         print(f"Dataset {dataset_id} created.")
 
@@ -731,8 +759,19 @@ def import_mc_into_bq(mc_reports_directory, bq_dataset_name, bq_table_prefix, se
         sheet_name = mc_names[file]
         mc_data[file] = pd.read_csv(file_fullpath, low_memory=False)
         # Replacing column names since BQ doesn't like them with () & the python library "column character map" version doesn't appear to work.
-        mc_data[file].rename(columns={"Memory (GB)": "Memory - GB", "External Memory (GB)": "External Memory - GB"}, inplace=True)
+        mc_data[file].rename(columns={
+            "Memory (GB)": "Memory_GB",
+            "External Memory (GB)": "External_Memory_GB",
+            "Sub-Type_1": "Sub_Type_1",
+            "Sub-Type_2": "Sub_Type_2",
+            "Dest_Series": "Destination_Series",
+            "Extended_Memory_GB": "External_Memory_GB",
+            "Dest_Shape": "Destination_Shape",
+            "OS_or_Licenses_Cost": "OS_Licenses_Cost"
+        }, inplace=True)
+        mc_data[file].rename(columns=lambda x: x.replace(" ", "_"), inplace=True)
 
+        # print(mc_data[file].columns)
         dataframe = pd.DataFrame(
             mc_data[file],
             # In the loaded table, the column order reflects the order of the
@@ -761,7 +800,7 @@ def import_mc_into_bq(mc_reports_directory, bq_dataset_name, bq_table_prefix, se
             create_disposition=bigquery.CreateDisposition.CREATE_IF_NEEDED,
             column_name_character_map="V2",
             allow_quoted_newlines=True,
-            quote_character="",
+            #quote_character="",
             schema=schema,
             source_format=bigquery.SourceFormat.CSV
         )
@@ -779,6 +818,8 @@ def import_mc_into_bq(mc_reports_directory, bq_dataset_name, bq_table_prefix, se
         )
 
     print("Completed loading of Migration Center Data into Big Query.")
+
+    print(f"Looker URL: {looker_report_url}")
 
 
 # Parse CLI Arguments
@@ -798,10 +839,10 @@ def parse_cli_args():
                         help='Google Service Account JSON Key File. Both Drive & Sheets API in GCP Project must be enabled! ')
     parser.add_argument('-b', action='store_true', required=False,
                         help='Import Migration Center CSV files into Biq Query Dataset. GCP BQ API must be enabled! ')
-    parser.add_argument('-n', metavar='BQ Dataset Name', required=False,
-                        help='Biq Query Dataset Name. Default dataset name is \'mc_import_dataset\'.')
-    parser.add_argument('-t', metavar='BQ Table Prefix', required=False,
-                        help='Biq Query Table Name. Default table prefix is \'mc_import_\'.')
+    parser.add_argument('-i', metavar='BQ Connect Info', required=False,
+                        help='BQ Connection Info: Format is <GCP Project ID>.<BQ Dataset Name>.<BQ Table Prefix>, i.e. googleproject.bqdataset.bqtable_prefix')
+    # parser.add_argument('-t', metavar='BQ Table Prefix', required=False,
+    #                     help='Biq Query Table Name. Default table prefix is \'mc_import_\'.')
     return parser.parse_args()
 
 
@@ -855,9 +896,16 @@ def main():
         import_mc_data(mc_reports_directory, spreadsheet, credentials)
 
         spreadsheet_url = "https://docs.google.com/spreadsheets/d/%s" % spreadsheet.id
+
         print("Migration Center Pricing Report for " + customer_name + ": " + spreadsheet_url)
     else:
+        bq_connection_info = args.i
+        (gcp_project_id, bq_dataset_name, bq_table_prefix) = bq_connection_info.split(".")
+
         print("Importing Migration Center data into Big Query...")
+        print(f"GCP Project ID: {gcp_project_id}")
+        print(f"BQ Dataset Name: {bq_dataset_name}")
+        print(f"BQ Table Prefix: {bq_table_prefix}")
         print(
             "IMPORTANT: All Big Query tables will be REPLACED! Please Ctrl-C in the next 5 seconds if you wish to abort.")
         time.sleep(5)
@@ -865,15 +913,15 @@ def main():
         print(
             "Once the BQ import is complete, you will need to manually connect a Google Sheets to the Big Query tables using 'Data' -> 'Data Connectors' -> 'Connect to Biq Query'.")
         print("Complete Data Connector instructions can be found here: https://support.google.com/docs/answer/9702507")
-        if args.n is not None:
-            bq_dataset_name = args.n
-        else:
-            bq_dataset_name = "mc_import_dataset"
-
-        if args.t is not None:
-            bq_table_prefix = args.t
-        else:
-            bq_table_prefix = "mc_import_"
+        # if args.n is not None:
+        #     bq_dataset_name = args.n
+        # else:
+        #     bq_dataset_name = "mc_import_dataset"
+        #
+        # if args.t is not None:
+        #     bq_table_prefix = args.t
+        # else:
+        #     bq_table_prefix = "mc_import_"
 
         if args.k is not None:
             service_account_key = args.k
@@ -881,10 +929,12 @@ def main():
         else:
             service_account_key = ""
 
-        print(f"BQ Dataset Name: {bq_dataset_name}")
-        print(f"BQ Table Prefix: {bq_table_prefix}")
+        if args.c is not None:
+            customer_name = args.c
+        else:
+            customer_name = "No Name Customer, Inc."
 
-        import_mc_into_bq(mc_reports_directory, bq_dataset_name, bq_table_prefix, service_account_key)
+        import_mc_into_bq(mc_reports_directory, gcp_project_id, bq_dataset_name, bq_table_prefix, service_account_key, customer_name)
 
 
 if __name__ == "__main__":
