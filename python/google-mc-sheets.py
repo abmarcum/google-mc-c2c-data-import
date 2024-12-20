@@ -647,7 +647,8 @@ def google_auth(service_account_key, scope):
     return credentials
 
 
-def import_mc_into_bq(mc_reports_directory, gcp_project_id, bq_dataset_name, bq_table_prefix, service_account_key, customer_name):
+def import_mc_into_bq(mc_reports_directory, gcp_project_id, bq_dataset_name, bq_table_prefix, service_account_key,
+                      customer_name):
     ##CHANGE
     # gcp_project_id = "amarcum-argolis-pricing-ewuu3b"
 
@@ -684,7 +685,6 @@ def import_mc_into_bq(mc_reports_directory, gcp_project_id, bq_dataset_name, bq_
 
     looker_report_url = f"{looker_url_prefix}{looker_template_id}&r.reportName={looker_report_name}&ds.ds0.connector=bigQuery&ds.ds0.datasourceName={looker_ds0_bq_datasource_name}&ds.ds0.projectId={looker_ds0_project_id}&ds.ds0.type=TABLE&ds.ds0.datasetId={looker_ds0_bq_dataset}&ds.ds0.tableId={looker_ds0_bq_table}&ds.ds1.connector=bigQuery&ds.ds1.datasourceName={looker_ds1_bq_datasource_name}&ds.ds1.projectId={looker_ds1_project_id}&ds.ds1.type=TABLE&ds.ds1.datasetId={looker_ds1_bq_dataset}&ds.ds1.tableId={looker_ds1_bq_table}"
 
-
     mc_data = {}
     mc_file_list = []
     # Grabbing a list of files from the provided mc directory
@@ -697,8 +697,9 @@ def import_mc_into_bq(mc_reports_directory, gcp_project_id, bq_dataset_name, bq_
     except:
         print("Unable to access directory: " + mc_reports_directory)
         exit()
+
     # Verify MC files exist
-    if len(mc_file_list) != len(mappings_file["mc_names"].keys()):
+    if len(mc_file_list) < len(mappings_file["mc_names"].keys()):
         print("Required MC data files do not exist! Exiting!")
         exit()
 
@@ -751,16 +752,22 @@ def import_mc_into_bq(mc_reports_directory, gcp_project_id, bq_dataset_name, bq_
             # Replacing column names since BQ doesn't like them with () & the python library "column character map" version doesn't appear to work.
 
             # Ensure the various MC & calctl versions have the same column names
-            mc_data[file].rename(columns={
-                "Memory (GB)": "Memory_GB",
-                "External Memory (GB)": "External_Memory_GB",
-                "Sub-Type 1": "Sub_Type_1",
-                "Sub-Type 2": "Sub_Type_2",
-                "Dest Series": "Destination_Series",
-                "Extended Memory GB": "External_Memory_GB",
-                "Dest Shape": "Destination_Shape",
-                "OS or Licenses Cost": "OS_Licenses_Cost"
-            }, inplace=True)
+            if file == 'mapped':
+                mc_data[file].rename(columns={
+                    "Memory (GB)": "Memory_GB",
+                    "External Memory (GB)": "External_Memory_GB",
+                    "Sub-Type 1": "Sub_Type_1",
+                    "Sub-Type 2": "Sub_Type_2",
+                    "Dest Series": "Destination_Series",
+                    "Extended Memory GB": "External_Memory_GB",
+                    "Dest Shape": "Destination_Shape",
+                    "OS or Licenses Cost": "OS_Licenses_Cost",
+                    "Dest. Shape": "Destination_Shape",
+                    "Dest. Series": "Destination_Series",
+                    "OS / Licenses Cost": "OS_Licenses_Cost",
+                    "Account/Subscription": "Account_Or_Subscription",
+                    "Ext. Memory (GB)": "External_Memory_GB"
+                }, inplace=True)
 
             # Ensure no spaces exist in any column names
             mc_data[file].rename(columns=lambda x: x.replace(" ", "_"), inplace=True)
@@ -926,7 +933,8 @@ def main():
         else:
             customer_name = "No Name Customer, Inc."
 
-        import_mc_into_bq(mc_reports_directory, gcp_project_id, bq_dataset_name, bq_table_prefix, service_account_key, customer_name)
+        import_mc_into_bq(mc_reports_directory, gcp_project_id, bq_dataset_name, bq_table_prefix, service_account_key,
+                          customer_name)
 
 
 if __name__ == "__main__":
