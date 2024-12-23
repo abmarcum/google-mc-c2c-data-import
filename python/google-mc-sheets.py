@@ -775,12 +775,12 @@ def import_mc_into_bq(mc_reports_directory, gcp_project_id, bq_dataset_name, bq_
             # More ensuring the various MC & calctl versions have the same column names
             mc_data[file].rename(columns=lambda x: x.replace("product_", "lineItem_"), inplace=True)
 
-            dataframe = pd.DataFrame(
-                mc_data[file],
-                # In the loaded table, the column order reflects the order of the
-                # columns in the DataFrame.
-                columns=mc_column_names[file]
-            )
+            # dataframe = pd.DataFrame(
+            #     mc_data[file],
+            #     # In the loaded table, the column order reflects the order of the
+            #     # columns in the DataFrame.
+            #     columns=mc_column_names[file]
+            # )
 
             schema = []
             # Create Schema Fields for BQ
@@ -808,6 +808,8 @@ def import_mc_into_bq(mc_reports_directory, gcp_project_id, bq_dataset_name, bq_
                 mc_data[file], table_id, job_config=job_config
             )  # Make an API request.
             job.result()  # Wait for the job to complete.
+
+            mc_data[file] = mc_data[file].iloc[0:0]
 
             table = client.get_table(table_id)  # Make an API request.
             print(
