@@ -49,6 +49,8 @@ mc_names = mappings_file["mc_names"]
 mc_column_names = mappings_file["mc_column_names"]
 f.close()
 
+default_looker_template_id = "421c8150-e7ad-4190-b044-6a18ecdbd391"
+
 
 # Check number of rows & columns in CSV file
 def check_csv_size(mc_reports_directory):
@@ -648,10 +650,7 @@ def google_auth(service_account_key, scope):
 
 
 def import_mc_into_bq(mc_reports_directory, gcp_project_id, bq_dataset_name, bq_table_prefix, service_account_key,
-                      customer_name):
-    ##CHANGE
-    # gcp_project_id = "amarcum-argolis-pricing-ewuu3b"
-
+                      customer_name, display_looker, looker_template_id):
     # GCP Scope for auth
     scope = [
         "https://www.googleapis.com/auth/drive",
@@ -661,29 +660,6 @@ def import_mc_into_bq(mc_reports_directory, gcp_project_id, bq_dataset_name, bq_
     #Google Auth
     credentials = google_auth(service_account_key, scope)
     client = gspread.authorize(credentials)
-
-    # Looker Settings
-    looker_url_prefix = "https://lookerstudio.google.com/reporting/create?c.reportId="
-    looker_template_id = "421c8150-e7ad-4190-b044-6a18ecdbd391"
-    looker_report_name = f"AWS -> GCP Pricing Analysis: {customer_name}, {datetime}"
-    looker_report_name = urllib.parse.quote_plus(looker_report_name)
-
-    looker_ds0_project_id = gcp_project_id  # Mapped BQ Project ID
-    looker_ds0_bq_datasource_name = "mapped"  # Mapped BQ Looker Name
-    looker_ds0_bq_dataset = bq_dataset_name  # Mapped BQ Dataset
-    looker_ds0_bq_table = f"{bq_table_prefix}mapped"  # Mapped BQ Table
-
-    looker_ds1_project_id = gcp_project_id  # Unmapped BQ Project ID
-    looker_ds1_bq_datasource_name = "unmapped"  # Unmapped BQ Looker Name
-    looker_ds1_bq_dataset = bq_dataset_name  # Unmapped BQ Dataset
-    looker_ds1_bq_table = f"{bq_table_prefix}unmapped"  # Unmapped BQ Table
-
-    looker_ds2_project_id = ""  # Discount BQ Project ID
-    looker_ds2_bq_datasource_name = ""  # Discount BQ Looker Name
-    looker_ds2_bq_dataset = ""  # Discount BQ Dataset
-    looker_ds2_bq_table = ""  # Discount BQ Table
-
-    looker_report_url = f"{looker_url_prefix}{looker_template_id}&r.reportName={looker_report_name}&ds.ds0.connector=bigQuery&ds.ds0.datasourceName={looker_ds0_bq_datasource_name}&ds.ds0.projectId={looker_ds0_project_id}&ds.ds0.type=TABLE&ds.ds0.datasetId={looker_ds0_bq_dataset}&ds.ds0.tableId={looker_ds0_bq_table}&ds.ds1.connector=bigQuery&ds.ds1.datasourceName={looker_ds1_bq_datasource_name}&ds.ds1.projectId={looker_ds1_project_id}&ds.ds1.type=TABLE&ds.ds1.datasetId={looker_ds1_bq_dataset}&ds.ds1.tableId={looker_ds1_bq_table}"
 
     mc_data = {}
     mc_file_list = []
@@ -775,13 +751,6 @@ def import_mc_into_bq(mc_reports_directory, gcp_project_id, bq_dataset_name, bq_
             # More ensuring the various MC & calctl versions have the same column names
             mc_data[file].rename(columns=lambda x: x.replace("product_", "lineItem_"), inplace=True)
 
-            # dataframe = pd.DataFrame(
-            #     mc_data[file],
-            #     # In the loaded table, the column order reflects the order of the
-            #     # columns in the DataFrame.
-            #     columns=mc_column_names[file]
-            # )
-
             schema = []
             # Create Schema Fields for BQ
             for column in mc_column_names[file].keys():
@@ -822,15 +791,163 @@ def import_mc_into_bq(mc_reports_directory, gcp_project_id, bq_dataset_name, bq_
 
     print("Completed loading of Migration Center Data into Big Query.")
 
-    print(f"Looker URL: {looker_report_url}")
+    if display_looker is True:
+        # Looker Settings
+        looker_url_prefix = "https://lookerstudio.google.com/reporting/create?c.reportId="
+        looker_report_name = f"AWS -> GCP Pricing Analysis: {customer_name}, {datetime}"
+        looker_report_name = urllib.parse.quote_plus(looker_report_name)
+
+        looker_ds0_project_id = gcp_project_id  # Mapped BQ Project ID
+        looker_ds0_bq_datasource_name = "mapped"  # Mapped BQ Looker Name
+        looker_ds0_bq_dataset = bq_dataset_name  # Mapped BQ Dataset
+        looker_ds0_bq_table = f"{bq_table_prefix}mapped"  # Mapped BQ Table
+
+        looker_ds1_project_id = gcp_project_id  # Unmapped BQ Project ID
+        looker_ds1_bq_datasource_name = "unmapped"  # Unmapped BQ Looker Name
+        looker_ds1_bq_dataset = bq_dataset_name  # Unmapped BQ Dataset
+        looker_ds1_bq_table = f"{bq_table_prefix}unmapped"  # Unmapped BQ Table
+
+        looker_ds2_project_id = gcp_project_id  # Discount BQ Project ID
+        looker_ds2_bq_datasource_name = "discounts"  # Discount BQ Looker Name
+        looker_ds2_bq_dataset = bq_dataset_name  # Discount BQ Dataset
+        looker_ds2_bq_table = f"{bq_table_prefix}discounts"  # Discount BQ Table
+
+        looker_report_url = f"{looker_url_prefix}{looker_template_id}&r.reportName={looker_report_name}&ds.ds0.connector=bigQuery&ds.ds0.datasourceName={looker_ds0_bq_datasource_name}&ds.ds0.projectId={looker_ds0_project_id}&ds.ds0.type=TABLE&ds.ds0.datasetId={looker_ds0_bq_dataset}&ds.ds0.tableId={looker_ds0_bq_table}&ds.ds1.connector=bigQuery&ds.ds1.datasourceName={looker_ds1_bq_datasource_name}&ds.ds1.projectId={looker_ds1_project_id}&ds.ds1.type=TABLE&ds.ds1.datasetId={looker_ds1_bq_dataset}&ds.ds1.tableId={looker_ds1_bq_table}"
+
+        print(f"Looker URL: {looker_report_url}")
+
+
+def import_cur_into_bq(mc_reports_directory, gcp_project_id, bq_dataset_name, bq_table_prefix, service_account_key,
+                       customer_name, display_looker, looker_template_id):
+    # GCP Scope for auth
+    scope = [
+        "https://www.googleapis.com/auth/drive",
+        "https://www.googleapis.com/auth/cloud-platform",
+    ]
+
+    #Google Auth
+    credentials = google_auth(service_account_key, scope)
+    client = gspread.authorize(credentials)
+
+    cur_data = {}
+    cur_file_list = [f for f in os.listdir(mc_reports_directory) if os.path.isfile(os.path.join(mc_reports_directory, f))]
+
+    # Create BQ dataset
+    client = bigquery.Client()
+    dataset_id = f"{gcp_project_id}.{bq_dataset_name}"
+
+    # Construct a full Dataset object to send to the API.
+    dataset = bigquery.Dataset(dataset_id)
+
+    try:
+        client.get_dataset(dataset_id)  # Check if dataset exists
+        print(f"Dataset {dataset_id} already exists.")
+    except:
+        dataset.location = "US"
+        try:
+            dataset = client.create_dataset(dataset, timeout=30)  # Make an API request.
+        except:
+            print(f"Unable to create dataset: {dataset_id}")
+            exit()
+
+        print(f"Dataset {dataset_id} created.")
+
+    bq_table_name = (f"{bq_table_prefix}")
+    table_id = (f"{gcp_project_id}.{bq_dataset_name}.{bq_table_name}")
+    # Deleting table first if exists
+
+    client.delete_table(table_id, not_found_ok=True)
+
+    # Importing all CSV files into a dictionary of dataframes
+    for file in cur_file_list:
+        with open(f"{mc_reports_directory}{file}", "rb") as f:
+            num_lines = sum(1 for _ in f)
+        if num_lines > 1:
+            print(f"Importing {file} into BQ Table: {table_id}")
+            set_gcp_project = f"gcloud config set project {gcp_project_id} >/dev/null 2>&1"
+
+            # schema = ""
+            # for column in mc_column_names[file].keys():
+            #     schema = schema + f"\"{column}\":{mc_column_names[file][column]},"
+            #
+            # # Remove last comma
+            # schema = schema[:-1]
+            try:
+                os.system(set_gcp_project)
+            except Exception as e:
+                print(f"error: {e}")
+
+            # if file.endswith(".csv"):
+            file_fullpath = (f"{mc_reports_directory}{file}")
+
+            cur_data[file] = pd.read_csv(file_fullpath, low_memory=False)
+
+            # Ensure no spaces exist in any column names
+            cur_data[file].rename(columns=lambda x: x.replace(" ", "_"), inplace=True)
+            cur_data[file].rename(columns=lambda x: x.replace("/", "_"), inplace=True)
+
+            job_config = bigquery.LoadJobConfig(
+
+                autodetect=True,
+                skip_leading_rows=1,
+                write_disposition=bigquery.WriteDisposition.WRITE_APPEND,
+                create_disposition=bigquery.CreateDisposition.CREATE_IF_NEEDED,
+                column_name_character_map="V2",
+                allow_quoted_newlines=True,
+                #schema=schema,
+                source_format=bigquery.SourceFormat.CSV
+            )
+
+            job = client.load_table_from_dataframe(
+                cur_data[file], table_id, job_config=job_config
+            )  # Make an API request.
+            job.result()  # Wait for the job to complete.
+
+            cur_data[file] = cur_data[file].iloc[0:0]
+
+            table = client.get_table(table_id)  # Make an API request.
+            print(
+                "Loaded {} rows and {} columns to {}".format(
+                    table.num_rows, len(table.schema), table_id
+                )
+            )
+        else:
+            print(f"Skipping {file} since there is no data in the file.")
+
+    print("Completed loading of AWS CUR Data into Big Query.")
+
+    if display_looker is True:
+        # Looker Settings
+        looker_url_prefix = "https://lookerstudio.google.com/reporting/create?c.reportId="
+        looker_report_name = f"AWS -> GCP Pricing Analysis: {customer_name}, {datetime}"
+        looker_report_name = urllib.parse.quote_plus(looker_report_name)
+
+        looker_ds0_project_id = gcp_project_id  # Mapped BQ Project ID
+        looker_ds0_bq_datasource_name = "mapped"  # Mapped BQ Looker Name
+        looker_ds0_bq_dataset = bq_dataset_name  # Mapped BQ Dataset
+        looker_ds0_bq_table = f"{bq_table_prefix}mapped"  # Mapped BQ Table
+
+        looker_ds1_project_id = gcp_project_id  # Unmapped BQ Project ID
+        looker_ds1_bq_datasource_name = "unmapped"  # Unmapped BQ Looker Name
+        looker_ds1_bq_dataset = bq_dataset_name  # Unmapped BQ Dataset
+        looker_ds1_bq_table = f"{bq_table_prefix}unmapped"  # Unmapped BQ Table
+
+        looker_ds2_project_id = gcp_project_id  # Discount BQ Project ID
+        looker_ds2_bq_datasource_name = "discounts"  # Discount BQ Looker Name
+        looker_ds2_bq_dataset = bq_dataset_name  # Discount BQ Dataset
+        looker_ds2_bq_table = f"{bq_table_prefix}discounts"  # Discount BQ Table
+
+        looker_report_url = f"{looker_url_prefix}{looker_template_id}&r.reportName={looker_report_name}&ds.ds0.connector=bigQuery&ds.ds0.datasourceName={looker_ds0_bq_datasource_name}&ds.ds0.projectId={looker_ds0_project_id}&ds.ds0.type=TABLE&ds.ds0.datasetId={looker_ds0_bq_dataset}&ds.ds0.tableId={looker_ds0_bq_table}&ds.ds1.connector=bigQuery&ds.ds1.datasourceName={looker_ds1_bq_datasource_name}&ds.ds1.projectId={looker_ds1_project_id}&ds.ds1.type=TABLE&ds.ds1.datasetId={looker_ds1_bq_dataset}&ds.ds1.tableId={looker_ds1_bq_table}"
+
+        print(f"Looker URL: {looker_report_url}")
 
 
 # Parse CLI Arguments
 def parse_cli_args():
     parser = argparse.ArgumentParser(prog='google-mc-sheets.py',
                                      usage='%(prog)s -d <mc report directory>\nThis creates an instance mapping between cloud providers and GCP')
-    parser.add_argument('-d', metavar='MC Data Directory',
-                        help='Directory containing mc report output. Contains mapped.csv, unmapped.csv, etc',
+    parser.add_argument('-d', metavar='Data Directory',
+                        help='Directory containing MC report output or AWS CUR data.',
                         required=True, )
     parser.add_argument('-c', metavar='Customer Name', help='Customer Name',
                         required=False, )
@@ -841,7 +958,13 @@ def parse_cli_args():
     parser.add_argument('-k', metavar='SA JSON Keyfile', required=False,
                         help='Google Service Account JSON Key File. Both Drive & Sheets API in GCP Project must be enabled! ')
     parser.add_argument('-b', action='store_true', required=False,
-                        help='Import Migration Center CSV files into Biq Query Dataset. GCP BQ API must be enabled! ')
+                        help='Import Migration Center data files into Biq Query Dataset.\nGCP BQ API must be enabled! ')
+    parser.add_argument('-a', action='store_true', required=False,
+                        help='Import AWS CUR file into Biq Query Dataset.\nGCP BQ API must be enabled! ')
+    parser.add_argument('-l', action='store_true', required=False,
+                        help='Display Looker Report URL. Migration Center or AWS CUR BQ Import must be enabled! ')
+    parser.add_argument('-r', metavar='Looker Template ID', required=False,
+                        help='Replaces Default Looker Report Template ID')
     parser.add_argument('-i', metavar='BQ Connect Info', required=False,
                         help='BQ Connection Info: Format is <GCP Project ID>.<BQ Dataset Name>.<BQ Table Prefix>, i.e. googleproject.bqdataset.bqtable_prefix')
     return parser.parse_args()
@@ -850,8 +973,14 @@ def parse_cli_args():
 def main():
     args = parse_cli_args()
 
-    mc_reports_directory = args.d
+    enable_cur_import = args.a
     enable_bq_import = args.b
+    mc_reports_directory = args.d
+    display_looker = args.l
+    if args.r is not None:
+        looker_template_id = args.r
+    else:
+        looker_template_id = default_looker_template_id
 
     print(f"Migration Center Pricing Report to Google sheets, {version}")
 
@@ -868,7 +997,7 @@ def main():
         print("Migration Center Reports directory not defined, exiting!")
         exit()
 
-    if enable_bq_import is not True:
+    if enable_bq_import is not True and enable_cur_import is not True:
         check_csv_size(mc_reports_directory)
 
         if args.e is not None:
@@ -903,7 +1032,7 @@ def main():
         bq_connection_info = args.i
         (gcp_project_id, bq_dataset_name, bq_table_prefix) = bq_connection_info.split(".")
 
-        print("Importing Migration Center data into Big Query...")
+        print("Importing data into Big Query...")
         print(f"GCP Project ID: {gcp_project_id}")
         print(f"BQ Dataset Name: {bq_dataset_name}")
         print(f"BQ Table Prefix: {bq_table_prefix}")
@@ -935,8 +1064,16 @@ def main():
         else:
             customer_name = "No Name Customer, Inc."
 
-        import_mc_into_bq(mc_reports_directory, gcp_project_id, bq_dataset_name, bq_table_prefix, service_account_key,
-                          customer_name)
+        if enable_bq_import is True:
+            print("Migration Center Data import...")
+            import_cur_into_bq(mc_reports_directory, gcp_project_id, bq_dataset_name, bq_table_prefix,
+                               service_account_key, customer_name, display_looker, looker_template_id)
+
+        if enable_cur_import is True:
+            print("AWS CUR import...")
+            import_cur_into_bq(mc_reports_directory, gcp_project_id, bq_dataset_name, bq_table_prefix,
+                               service_account_key,
+                               customer_name, display_looker, looker_template_id)
 
 
 if __name__ == "__main__":
