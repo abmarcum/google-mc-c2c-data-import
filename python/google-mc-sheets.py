@@ -1047,12 +1047,12 @@ def main():
         print(f"BQ Dataset Name: {bq_dataset_name}")
         print(f"BQ Table Prefix: {bq_table_prefix}")
         print(
-            "IMPORTANT: All Big Query tables will be REPLACED! Please Ctrl-C in the next 5 seconds if you wish to abort.")
+            "\nIMPORTANT: All Big Query tables will be REPLACED! Please Ctrl-C in the next 5 seconds if you wish to abort.")
         time.sleep(5)
         print("NOTE: Using this option will NOT automatically create a Google Sheets with your Migration Center Data.")
         print(
             "Once the BQ import is complete, you will need to manually connect a Google Sheets to the Big Query tables using 'Data' -> 'Data Connectors' -> 'Connect to Biq Query'.")
-        print("Complete Data Connector instructions can be found here: https://support.google.com/docs/answer/9702507")
+        print("Complete Data Connector instructions can be found here: https://support.google.com/docs/answer/9702507\n")
 
         if args.k is not None:
             service_account_key = args.k
@@ -1070,7 +1070,15 @@ def main():
             import_cur_into_bq(mc_reports_directory, gcp_project_id, bq_dataset_name, bq_table_prefix,
                                service_account_key, customer_name, display_looker, looker_template_id)
 
-        if enable_cur_import is True:
+        if enable_bq_import is True and enable_cur_import is True:
+            import_cur_into_bq(mc_reports_directory, gcp_project_id, bq_dataset_name, bq_table_prefix,
+                               service_account_key, customer_name, display_looker, looker_template_id)
+
+            import_cur_into_bq(mc_reports_directory, gcp_project_id, bq_dataset_name, bq_table_prefix,
+                               service_account_key,
+                               customer_name, False, "")
+
+        if enable_cur_import is True and enable_bq_import is False:
             print("AWS CUR import...")
             import_cur_into_bq(mc_reports_directory, gcp_project_id, bq_dataset_name, bq_table_prefix,
                                service_account_key,
