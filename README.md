@@ -61,20 +61,23 @@ $ gcloud auth application-default login --scopes='https://www.googleapis.com/aut
 #### Application Arguments
 ```shell 
 $ cd google-mc-sheets/python
-python google-mc-sheets.py -h
+ python google-mc-sheets.py -h
 usage: google-mc-sheets.py -d <mc report directory>
 This creates an instance mapping between cloud providers and GCP
 
 options:
-  -h, --help            show this help message and exit
-  -d MC Data Directory  Directory containing mc report output. Contains mapped.csv, unmapped.csv, etc
-  -c Customer Name      Customer Name
-  -e Email Addresses    Emails to share Google Sheets with (comma separated)
-  -s Google Sheets ID   Use existing Google Sheets instead of creating a new one. Takes Sheets ID
-  -k SA JSON Keyfile    Google Service Account JSON Key File. Both Drive & Sheets API in GCP Project must be enabled!
-  -b                    Import Migration Center CSV files into Biq Query Dataset. GCP BQ API must be enabled!
-  -n BQ Dataset Name    Biq Query Dataset Name. Default dataset name is 'mc_import_dataset'.
-  -t BQ Table Prefix    Biq Query Table Name. Default table prefix is 'mc_import_'.
+  -h, --help           show this help message and exit
+  -d Data Directory    Directory containing MC report output or AWS CUR data.
+  -c Customer Name     Customer Name
+  -e Email Addresses   Emails to share Google Sheets with (comma separated)
+  -s Google Sheets ID  Use existing Google Sheets instead of creating a new one. Takes Sheets ID
+  -k SA JSON Keyfile   Google Service Account JSON Key File. Both Drive & Sheets API in GCP Project must be enabled!
+  -b                   Import Migration Center data files into Biq Query Dataset. GCP BQ API must be enabled!
+  -a                   Import AWS CUR file into Biq Query Dataset. GCP BQ API must be enabled!
+  -l                   Display Looker Report URL. Migration Center or AWS CUR BQ Import must be enabled!
+  -r Looker Templ ID   Replaces Default Looker Report Template ID
+  -i BQ Connect Info   BQ Connection Info: Format is <GCP Project ID>.<BQ Dataset Name>.<BQ Table Prefix>, i.e. googleproject.bqdataset.bqtable_prefix
+
 ```
 
 ---
@@ -96,29 +99,35 @@ Migration Center Pricing Report: Demo Customer, Inc: https://docs.google.com/spr
 ```
 
 ---
-#### Example Run: Big Query Import
-
+#### Example Run: Big Query Import with Looker Report
 
 ```shell 
 $ cd google-mc-sheets/python
-$ python google-mc-sheets.py -d ~/mc-reports/ -c "Demo Customer, Inc" -n cur_test_customer -t dec_2024_ -b 
+$ python google-mc-sheets.py  -d ~/calcctl-output/ -c "Test Customer, Inc" -b -l -i test-project-id.test-customer.calcctl_
 Migration Center Pricing Report to Google sheets, v0.2
-Customer: Demo Customer, Inc
-Migration Center Reports directory: ~/mc-reports/
-Importing Migration Center data into Big Query...
+Customer: Test Customer, Inc
+Migration Center Reports directory: /Users/test-user/calcctl-output/
+Importing data into Big Query...
+GCP Project ID: test-project-id
+BQ Dataset Name: test-customer
+BQ Table Prefix: calcctl_
+
 IMPORTANT: All Big Query tables will be REPLACED! Please Ctrl-C in the next 5 seconds if you wish to abort.
-NOTE: Using the option will NOT automatically create a Google Sheets with Migration Center Data.
-Once the BQ import is complete, you will need to connect a Google Sheets to the Big Query tables using 'Data' -> 'Data Connectors' -> 'Connect to Biq Query'.
+
+NOTE: Using this option will NOT automatically create a Google Sheets with your Migration Center Data.
+Once the BQ import is complete, you will need to manually connect a Google Sheets to the Big Query tables using 'Data' -> 'Data Connectors' -> 'Connect to Biq Query'.
 Complete Data Connector instructions can be found here: https://support.google.com/docs/answer/9702507
-BQ Dataset Name: cur_test_customer
-BQ Table Prefix: dec_2024_
+
+Migration Center Data import...
 Importing pricing report files...
-Dataset gcp-project-id.cur_test_customer created.
-Importing mapped.csv into BQ Table: gcp-project-id.cur_test_customer.dec_2024_mapped
-Loaded 1090900 rows and 27 columns to gcp-project-id.cur_test_customer.dec_2024_mapped
-Importing unmapped.csv into BQ Table: gcp-project-id.cur_test_customer.dec_2024_unmapped
-Loaded 4988 rows and 17 columns to gcp-project-id.cur_test_customer.dec_2024_unmapped
-Importing discount.csv into BQ Table: gcp-project-id.cur_test_customer.dec_2024_discount
-Loaded 0 rows and 17 columns to gcp-project-id.cur_test_customer.dec_2024_discount
+Dataset test-project-id.test-customer already exists.
+Importing mapped.csv into BQ Table: test-project-id.test-customer.calcctl_mapped
+Loaded 6288 rows and 27 columns to test-project-id.test-customer.calcctl_mapped
+Importing unmapped.csv into BQ Table: test-project-id.test-customer.calcctl_unmapped
+Loaded 50863 rows and 14 columns to test-project-id.test-customer.calcctl_unmapped
+Importing discount.csv into BQ Table: test-project-id.test-customer.calcctl_discount
+Loaded 1751 rows and 14 columns to test-project-id.test-customer.calcctl_discount
 Completed loading of Migration Center Data into Big Query.
+
+Looker URL: https://lookerstudio.google.com/reporting/create?c.reportId=421c8150-e7ad-4190-b044-6a18ecdbd391&r.reportName=AWS+-%3E+GCP+Pricing+Analysis%3A+Test+Customer%2C+Inc%2C+2025-01-03+13%3A46&ds.ds0.connector=bigQuery&ds.ds0.datasourceName=mapped&ds.ds0.projectId=test-project-id&ds.ds0.type=TABLE&ds.ds0.datasetId=test-customer&ds.ds0.tableId=calcctl_mapped&ds.ds1.connector=bigQuery&ds.ds1.datasourceName=unmapped&ds.ds1.projectId=test-project-id&ds.ds1.type=TABLE&ds.ds1.datasetId=test-customer&ds.ds1.tableId=calcctl_unmapped
 ```

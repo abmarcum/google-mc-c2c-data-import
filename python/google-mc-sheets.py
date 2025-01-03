@@ -916,7 +916,7 @@ def import_cur_into_bq(mc_reports_directory, gcp_project_id, bq_dataset_name, bq
         else:
             print(f"Skipping {file} since there is no data in the file.")
 
-    print("Completed loading of AWS CUR Data into Big Query.")
+    print("Completed loading of AWS CUR Data into Big Query.\n")
 
     if display_looker is True:
         # Looker Settings
@@ -965,7 +965,7 @@ def parse_cli_args():
                         help='Import AWS CUR file into Biq Query Dataset.\nGCP BQ API must be enabled! ')
     parser.add_argument('-l', action='store_true', required=False,
                         help='Display Looker Report URL. Migration Center or AWS CUR BQ Import must be enabled! ')
-    parser.add_argument('-r', metavar='Looker Template ID', required=False,
+    parser.add_argument('-r', metavar='Looker Templ ID', required=False,
                         help='Replaces Default Looker Report Template ID')
     parser.add_argument('-i', metavar='BQ Connect Info', required=False,
                         help='BQ Connection Info: Format is <GCP Project ID>.<BQ Dataset Name>.<BQ Table Prefix>, i.e. googleproject.bqdataset.bqtable_prefix')
