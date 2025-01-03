@@ -1047,7 +1047,7 @@ def main():
         print(f"BQ Dataset Name: {bq_dataset_name}")
         print(f"BQ Table Prefix: {bq_table_prefix}")
         print(
-            "\nIMPORTANT: All Big Query tables will be REPLACED! Please Ctrl-C in the next 5 seconds if you wish to abort.")
+            "\nIMPORTANT: All Big Query tables will be REPLACED! Please Ctrl-C in the next 5 seconds if you wish to abort.\n")
         time.sleep(5)
         print("NOTE: Using this option will NOT automatically create a Google Sheets with your Migration Center Data.")
         print(
@@ -1067,11 +1067,11 @@ def main():
 
         if enable_bq_import is True:
             print("Migration Center Data import...")
-            import_cur_into_bq(mc_reports_directory, gcp_project_id, bq_dataset_name, bq_table_prefix,
+            import_mc_into_bq(mc_reports_directory, gcp_project_id, bq_dataset_name, bq_table_prefix,
                                service_account_key, customer_name, display_looker, looker_template_id)
 
         if enable_bq_import is True and enable_cur_import is True:
-            import_cur_into_bq(mc_reports_directory, gcp_project_id, bq_dataset_name, bq_table_prefix,
+            import_mc_into_bq(mc_reports_directory, gcp_project_id, bq_dataset_name, bq_table_prefix,
                                service_account_key, customer_name, display_looker, looker_template_id)
 
             import_cur_into_bq(mc_reports_directory, gcp_project_id, bq_dataset_name, bq_table_prefix,
