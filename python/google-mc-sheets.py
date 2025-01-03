@@ -49,7 +49,8 @@ mc_names = mappings_file["mc_names"]
 mc_column_names = mappings_file["mc_column_names"]
 f.close()
 
-default_looker_template_id = "421c8150-e7ad-4190-b044-6a18ecdbd391"
+default_bq_looker_template_id = "421c8150-e7ad-4190-b044-6a18ecdbd391"
+default_cur_looker_template_id = ""
 
 
 # Check number of rows & columns in CSV file
@@ -830,7 +831,8 @@ def import_cur_into_bq(mc_reports_directory, gcp_project_id, bq_dataset_name, bq
     client = gspread.authorize(credentials)
 
     cur_data = {}
-    cur_file_list = [f for f in os.listdir(mc_reports_directory) if os.path.isfile(os.path.join(mc_reports_directory, f))]
+    cur_file_list = [f for f in os.listdir(mc_reports_directory) if
+                     os.path.isfile(os.path.join(mc_reports_directory, f))]
 
     # Create BQ dataset
     client = bigquery.Client()
@@ -980,7 +982,10 @@ def main():
     if args.r is not None:
         looker_template_id = args.r
     else:
-        looker_template_id = default_looker_template_id
+        if args.b is True:
+            looker_template_id = default_bq_looker_template_id
+        if args.a is True:
+            looker_template_id = default_cur_looker_template_id
 
     print(f"Migration Center Pricing Report to Google sheets, {version}")
 
@@ -1025,11 +1030,16 @@ def main():
 
         import_mc_data(mc_reports_directory, spreadsheet, credentials)
 
-        spreadsheet_url = "https://docs.google.com/spreadsheets/d/%s" % spreadsheet.id
+        spreadsheet_url = 'https://docs.google.com/spreadsheets/d/%s' % spreadsheet.id
 
         print("Migration Center Pricing Report for " + customer_name + ": " + spreadsheet_url)
     else:
+        if args.i is None:
+            print("No Big Query connection information provided. Exiting!")
+            exit()
+
         bq_connection_info = args.i
+
         (gcp_project_id, bq_dataset_name, bq_table_prefix) = bq_connection_info.split(".")
 
         print("Importing data into Big Query...")
@@ -1043,15 +1053,6 @@ def main():
         print(
             "Once the BQ import is complete, you will need to manually connect a Google Sheets to the Big Query tables using 'Data' -> 'Data Connectors' -> 'Connect to Biq Query'.")
         print("Complete Data Connector instructions can be found here: https://support.google.com/docs/answer/9702507")
-        # if args.n is not None:
-        #     bq_dataset_name = args.n
-        # else:
-        #     bq_dataset_name = "mc_import_dataset"
-        #
-        # if args.t is not None:
-        #     bq_table_prefix = args.t
-        # else:
-        #     bq_table_prefix = "mc_import_"
 
         if args.k is not None:
             service_account_key = args.k
