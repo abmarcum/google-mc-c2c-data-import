@@ -925,7 +925,7 @@ def import_cur_into_bq(mc_reports_directory, gcp_project_id, bq_dataset_name, bq
         looker_report_name = urllib.parse.quote_plus(looker_report_name)
 
         looker_ds0_project_id = gcp_project_id  # cur BQ Project ID
-        looker_ds0_bq_datasource_name = "mapped"  # cur BQ Looker Name
+        looker_ds0_bq_datasource_name = "cur"  # cur BQ Looker Name
         looker_ds0_bq_dataset = bq_dataset_name  # cur BQ Dataset
         looker_ds0_bq_table = f"{bq_table_prefix}"  # cur BQ Table
 
