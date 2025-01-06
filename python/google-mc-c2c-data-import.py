@@ -921,25 +921,15 @@ def import_cur_into_bq(mc_reports_directory, gcp_project_id, bq_dataset_name, bq
     if display_looker is True:
         # Looker Settings
         looker_url_prefix = "https://lookerstudio.google.com/reporting/create?c.reportId="
-        looker_report_name = f"AWS -> GCP Pricing Analysis: {customer_name}, {datetime}"
+        looker_report_name = f"GCP Migration Center - AWS CUR Analysis: {customer_name}, {datetime}"
         looker_report_name = urllib.parse.quote_plus(looker_report_name)
 
-        looker_ds0_project_id = gcp_project_id  # Mapped BQ Project ID
-        looker_ds0_bq_datasource_name = "mapped"  # Mapped BQ Looker Name
-        looker_ds0_bq_dataset = bq_dataset_name  # Mapped BQ Dataset
-        looker_ds0_bq_table = f"{bq_table_prefix}mapped"  # Mapped BQ Table
+        looker_ds0_project_id = gcp_project_id  # cur BQ Project ID
+        looker_ds0_bq_datasource_name = "mapped"  # cur BQ Looker Name
+        looker_ds0_bq_dataset = bq_dataset_name  # cur BQ Dataset
+        looker_ds0_bq_table = f"{bq_table_prefix}"  # cur BQ Table
 
-        looker_ds1_project_id = gcp_project_id  # Unmapped BQ Project ID
-        looker_ds1_bq_datasource_name = "unmapped"  # Unmapped BQ Looker Name
-        looker_ds1_bq_dataset = bq_dataset_name  # Unmapped BQ Dataset
-        looker_ds1_bq_table = f"{bq_table_prefix}unmapped"  # Unmapped BQ Table
-
-        looker_ds2_project_id = gcp_project_id  # Discount BQ Project ID
-        looker_ds2_bq_datasource_name = "discounts"  # Discount BQ Looker Name
-        looker_ds2_bq_dataset = bq_dataset_name  # Discount BQ Dataset
-        looker_ds2_bq_table = f"{bq_table_prefix}discounts"  # Discount BQ Table
-
-        looker_report_url = f"{looker_url_prefix}{looker_template_id}&r.reportName={looker_report_name}&ds.ds0.connector=bigQuery&ds.ds0.datasourceName={looker_ds0_bq_datasource_name}&ds.ds0.projectId={looker_ds0_project_id}&ds.ds0.type=TABLE&ds.ds0.datasetId={looker_ds0_bq_dataset}&ds.ds0.tableId={looker_ds0_bq_table}&ds.ds1.connector=bigQuery&ds.ds1.datasourceName={looker_ds1_bq_datasource_name}&ds.ds1.projectId={looker_ds1_project_id}&ds.ds1.type=TABLE&ds.ds1.datasetId={looker_ds1_bq_dataset}&ds.ds1.tableId={looker_ds1_bq_table}"
+        looker_report_url = f"{looker_url_prefix}{looker_template_id}&r.reportName={looker_report_name}&ds.ds0.connector=bigQuery&ds.ds0.datasourceName={looker_ds0_bq_datasource_name}&ds.ds0.projectId={looker_ds0_project_id}&ds.ds0.type=TABLE&ds.ds0.datasetId={looker_ds0_bq_dataset}&ds.ds0.tableId={looker_ds0_bq_table}"
 
         print(f"Looker URL: {looker_report_url}")
 
