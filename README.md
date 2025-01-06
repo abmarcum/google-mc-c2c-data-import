@@ -1,9 +1,8 @@
-# Google Migration Center Pricing to Google Sheets
+# Google Migration Center C2C Data Import
 
-This application will automatically create a Google Sheets from a Migration Center generated pricing report.
+This application can automatically create a [Google Sheets](https://sheets.google.com/) from a Migration Center generated pricing report OR import the Migration Center Report and/or AWS CUR into [Big Query](https://cloud.google.com/bigquery). If imported into BQ, a [Looker Studio](https://lookerstudio.google.com/) report can also be created.
 
-**NOTE** - Google Sheets has a limitation of 5 million cells and this size limit prevents the import of large (multi-gigabyte) Migration Center pricing reports. 
-Consider using the -b argument to import the MC data into Big Query instead. However, Google Sheets will not be created with the '-b' option and you must *manually* connect to Biq Query through the Google Sheets Data Connector. 
+**NOTE** - Google Sheets has a limitation of 5 million cells and this size limit prevents the import of large (multi-gigabyte) Migration Center pricing reports. If you hit the cell limitation, consider using the -b argument to import the MC data into Big Query instead. However, Google Sheets will not be created with the '-b' option and you must *manually* connect to Biq Query through the Google Sheets Data Connector. 
 
 Further Instuctions on using the Google Sheets Data Connector with Big Query can be found [here](https://support.google.com/docs/answer/9702507).
 
@@ -21,7 +20,7 @@ Instructions for installing the Google Cloud SDK can be found in the [Install th
 This application requires Python3 to be installed. Once it is installed, you can install the required Python modules using the included `requirements.txt` file:
 
 ```shell
-$ cd google-mc-sheets/python
+$ cd google-mc-c2c-data-import/python
 $ pip3 install -r requirements.txt
 ```
 #### Using with virtual environment 
@@ -30,7 +29,7 @@ If you wish to run the application inside of a python virtual environment, you c
 
 ```shell
 $ sudo apt install python3.11-venv
-$ cd google-mc-sheets/python/
+$ cd google-mc-c2c-data-import/python/
 $ python3 -m venv ../venv
 $ source ../venv/bin/activate
 (venv) $ pip3 install -r requirements.txt
@@ -39,9 +38,9 @@ $ source ../venv/bin/activate
 Now you can run the python script anytime by switching to the virtual environment:
 
 ```shell
-$ cd google-mc-sheets/python
+$ cd google-mc-c2c-data-import/python
 $ source ../venv/bin/activate
-(venv) $ python google-mc-sheets.py ....
+(venv) $ python google-mc-c2c-data-import.py ....
 ```
 
 ---
@@ -53,16 +52,16 @@ Once you have a project setup, you can run the following to authenticate against
 ```shell
 $ gcloud auth login
 $ gcloud config set project <PROJECT-ID>
-$ gcloud services enable drive.googleapis.com sheets.googleapis.com
+$ gcloud services enable drive.googleapis.com sheets.googleapis.com bigquery.googleapis.com
 $ gcloud auth application-default login --scopes='https://www.googleapis.com/auth/drive','https://www.googleapis.com/auth/cloud-platform'
 ```
 
 ---
 #### Application Arguments
 ```shell 
-$ cd google-mc-sheets/python
- python google-mc-sheets.py -h
-usage: google-mc-sheets.py -d <mc report directory>
+$ cd google-mc-c2c-data-import/python
+ python google-mc-c2c-data-import.py -h
+usage: google-mc-c2c-data-import.py -d <mc report directory>
 This creates an instance mapping between cloud providers and GCP
 
 options:
@@ -85,10 +84,10 @@ options:
 
 
 ```shell 
-$ cd google-mc-sheets/python
-$ python3 google-mc-sheets.py -d ~/mc-reports/ -c "Demo Customer, Inc"
-$ cd google-mc-sheets/python
-$ python3 google-mc-sheets.py -d ~/mc-reports/ -c "Demo Customer, Inc"
+$ cd google-mc-c2c-data-import/python
+$ python3 google-mc-c2c-data-import.py -d ~/mc-reports/ -c "Demo Customer, Inc"
+$ cd google-mc-c2c-data-import/python
+$ python3 google-mc-c2c-data-import.py -d ~/mc-reports/ -c "Demo Customer, Inc"
 Migration Center Pricing Report to Google sheets, v0.2
 Customer: Demo Customer, Inc
 Migration Center Reports directory: ~/mc-reports/
@@ -102,8 +101,8 @@ Migration Center Pricing Report: Demo Customer, Inc: https://docs.google.com/spr
 #### Example Run: Big Query Import with Looker Report
 
 ```shell 
-$ cd google-mc-sheets/python
-$ python google-mc-sheets.py  -d ~/calcctl-output/ -c "Test Customer, Inc" -b -l -i test-project-id.test-customer.calcctl_
+$ cd google-mc-c2c-data-import/python
+$ python google-mc-c2c-data-import.py  -d ~/calcctl-output/ -c "Test Customer, Inc" -b -l -i test-project-id.test-customer.calcctl_
 Migration Center Pricing Report to Google sheets, v0.2
 Customer: Test Customer, Inc
 Migration Center Reports directory: /Users/test-user/calcctl-output/

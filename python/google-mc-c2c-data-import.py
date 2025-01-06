@@ -946,7 +946,7 @@ def import_cur_into_bq(mc_reports_directory, gcp_project_id, bq_dataset_name, bq
 
 # Parse CLI Arguments
 def parse_cli_args():
-    parser = argparse.ArgumentParser(prog='google-mc-sheets.py',
+    parser = argparse.ArgumentParser(prog='google-mc-c2c-data-import.py',
                                      usage='%(prog)s -d <mc report directory>\nThis creates an instance mapping between cloud providers and GCP')
     parser.add_argument('-d', metavar='Data Directory',
                         help='Directory containing MC report output or AWS CUR data.',
