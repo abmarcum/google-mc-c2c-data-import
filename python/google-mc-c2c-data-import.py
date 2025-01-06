@@ -50,7 +50,7 @@ mc_column_names = mappings_file["mc_column_names"]
 f.close()
 
 default_bq_looker_template_id = "421c8150-e7ad-4190-b044-6a18ecdbd391"
-default_cur_looker_template_id = ""
+default_cur_looker_template_id = "c4e0ccbc-907a-4bc4-85f1-1711ee47c345"
 
 
 # Check number of rows & columns in CSV file
