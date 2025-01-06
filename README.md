@@ -69,8 +69,8 @@ options:
   -d Data Directory    Directory containing MC report output or AWS CUR data.
   -c Customer Name     Customer Name
   -e Email Addresses   Emails to share Google Sheets with (comma separated)
-  -s Google Sheets ID  Use existing Google Sheets instead of creating a new one. Takes Sheets ID
-  -k SA JSON Keyfile   Google Service Account JSON Key File. Both Drive & Sheets API in GCP Project must be enabled!
+  -s Google Sheets ID  Use existing Google Sheets instead of creating a new one. Takes Sheets ID. Both Drive & Sheets API in GCP Project must be enabled!
+  -k SA JSON Keyfile   Google Service Account JSON Key File. 
   -b                   Import Migration Center data files into Biq Query Dataset. GCP BQ API must be enabled!
   -a                   Import AWS CUR file into Biq Query Dataset. GCP BQ API must be enabled!
   -l                   Display Looker Report URL. Migration Center or AWS CUR BQ Import must be enabled!
