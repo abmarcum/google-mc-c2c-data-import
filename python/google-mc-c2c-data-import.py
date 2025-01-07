@@ -1061,12 +1061,8 @@ def main():
                                service_account_key, customer_name, display_looker, looker_template_id)
 
         if enable_bq_import is True and enable_cur_import is True:
-            import_mc_into_bq(mc_reports_directory, gcp_project_id, bq_dataset_name, bq_table_prefix,
-                               service_account_key, customer_name, display_looker, looker_template_id)
-
-            import_cur_into_bq(mc_reports_directory, gcp_project_id, bq_dataset_name, bq_table_prefix,
-                               service_account_key,
-                               customer_name, False, "")
+            print("Unable to import Migration Center & AWS CUR data at the same time. Please do each separately.")
+            exit()
 
         if enable_cur_import is True and enable_bq_import is False:
             print("AWS CUR import...")
