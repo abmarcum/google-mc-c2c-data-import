@@ -102,9 +102,9 @@ Migration Center Pricing Report: Demo Customer, Inc: https://docs.google.com/spr
 
 ```shell 
 $ cd google-mc-c2c-data-import/python
-$ python google-mc-c2c-data-import.py  -d ~/mc-reports/ -c "Test Customer, Inc" -b -l -i test-project-id.test-customer.mc_report_
+$ python google-mc-c2c-data-import.py  -d ~/mc-reports/ -c "Demo Customer, Inc" -b -l -i test-project-id.test-customer.mc_report_
 Migration Center Pricing Report to Google sheets, v0.2
-Customer: Test Customer, Inc
+Customer: Demo Customer, Inc
 Migration Center Reports directory: /Users/test-user/mc-reports/
 Importing data into Big Query...
 GCP Project ID: test-project-id
@@ -128,5 +128,5 @@ Importing discount.csv into BQ Table: test-project-id.test-customer.mc_report_di
 Loaded 1751 rows and 14 columns to test-project-id.test-customer.mc_report_discount
 Completed loading of Migration Center Data into Big Query.
 
-Looker URL: https://lookerstudio.google.com/reporting/create?c.reportId=421c8150-e7ad-4190-b044-6a18ecdbd391&r.reportName=AWS+-%3E+GCP+Pricing+Analysis%3A+Test+Customer%2C+Inc%2C+2025-01-03+13%3A46&ds.ds0.connector=bigQuery&ds.ds0.datasourceName=mapped&ds.ds0.projectId=test-project-id&ds.ds0.type=TABLE&ds.ds0.datasetId=test-customer&ds.ds0.tableId=mc_report_mapped&ds.ds1.connector=bigQuery&ds.ds1.datasourceName=unmapped&ds.ds1.projectId=test-project-id&ds.ds1.type=TABLE&ds.ds1.datasetId=test-customer&ds.ds1.tableId=mc_report_unmapped
+Looker URL: https://lookerstudio.google.com/reporting/create?c.reportId=421c8150-e7ad-4190-b044-6a18ecdbd391&r.reportName=AWS+-%3E+GCP+Pricing+Analysis%3A+Demo+Customer%2C+Inc%2C+2025-01-03+13%3A46&ds.ds0.connector=bigQuery&ds.ds0.datasourceName=mapped&ds.ds0.projectId=test-project-id&ds.ds0.type=TABLE&ds.ds0.datasetId=test-customer&ds.ds0.tableId=mc_report_mapped&ds.ds1.connector=bigQuery&ds.ds1.datasourceName=unmapped&ds.ds1.projectId=test-project-id&ds.ds1.type=TABLE&ds.ds1.datasetId=test-customer&ds.ds1.tableId=mc_report_unmapped
 ```
