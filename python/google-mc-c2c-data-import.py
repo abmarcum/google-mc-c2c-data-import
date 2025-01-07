@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# Migration Pricing Reports to Google Sheets
+# Migration Pricing Reports C2C Data Import
 
 # v0.2
 # Google
@@ -50,7 +50,7 @@ mc_column_names = mappings_file["mc_column_names"]
 f.close()
 
 default_bq_looker_template_id = "421c8150-e7ad-4190-b044-6a18ecdbd391"
-default_cur_looker_template_id = ""
+default_cur_looker_template_id = "c4e0ccbc-907a-4bc4-85f1-1711ee47c345"
 
 
 # Check number of rows & columns in CSV file
@@ -921,32 +921,22 @@ def import_cur_into_bq(mc_reports_directory, gcp_project_id, bq_dataset_name, bq
     if display_looker is True:
         # Looker Settings
         looker_url_prefix = "https://lookerstudio.google.com/reporting/create?c.reportId="
-        looker_report_name = f"AWS -> GCP Pricing Analysis: {customer_name}, {datetime}"
+        looker_report_name = f"GCP Migration Center - AWS CUR Analysis: {customer_name}, {datetime}"
         looker_report_name = urllib.parse.quote_plus(looker_report_name)
 
-        looker_ds0_project_id = gcp_project_id  # Mapped BQ Project ID
-        looker_ds0_bq_datasource_name = "mapped"  # Mapped BQ Looker Name
-        looker_ds0_bq_dataset = bq_dataset_name  # Mapped BQ Dataset
-        looker_ds0_bq_table = f"{bq_table_prefix}mapped"  # Mapped BQ Table
+        looker_ds0_project_id = gcp_project_id  # cur BQ Project ID
+        looker_ds0_bq_datasource_name = "cur"  # cur BQ Looker Name
+        looker_ds0_bq_dataset = bq_dataset_name  # cur BQ Dataset
+        looker_ds0_bq_table = f"{bq_table_prefix}"  # cur BQ Table
 
-        looker_ds1_project_id = gcp_project_id  # Unmapped BQ Project ID
-        looker_ds1_bq_datasource_name = "unmapped"  # Unmapped BQ Looker Name
-        looker_ds1_bq_dataset = bq_dataset_name  # Unmapped BQ Dataset
-        looker_ds1_bq_table = f"{bq_table_prefix}unmapped"  # Unmapped BQ Table
-
-        looker_ds2_project_id = gcp_project_id  # Discount BQ Project ID
-        looker_ds2_bq_datasource_name = "discounts"  # Discount BQ Looker Name
-        looker_ds2_bq_dataset = bq_dataset_name  # Discount BQ Dataset
-        looker_ds2_bq_table = f"{bq_table_prefix}discounts"  # Discount BQ Table
-
-        looker_report_url = f"{looker_url_prefix}{looker_template_id}&r.reportName={looker_report_name}&ds.ds0.connector=bigQuery&ds.ds0.datasourceName={looker_ds0_bq_datasource_name}&ds.ds0.projectId={looker_ds0_project_id}&ds.ds0.type=TABLE&ds.ds0.datasetId={looker_ds0_bq_dataset}&ds.ds0.tableId={looker_ds0_bq_table}&ds.ds1.connector=bigQuery&ds.ds1.datasourceName={looker_ds1_bq_datasource_name}&ds.ds1.projectId={looker_ds1_project_id}&ds.ds1.type=TABLE&ds.ds1.datasetId={looker_ds1_bq_dataset}&ds.ds1.tableId={looker_ds1_bq_table}"
+        looker_report_url = f"{looker_url_prefix}{looker_template_id}&r.reportName={looker_report_name}&ds.ds0.connector=bigQuery&ds.ds0.datasourceName={looker_ds0_bq_datasource_name}&ds.ds0.projectId={looker_ds0_project_id}&ds.ds0.type=TABLE&ds.ds0.datasetId={looker_ds0_bq_dataset}&ds.ds0.tableId={looker_ds0_bq_table}"
 
         print(f"Looker URL: {looker_report_url}")
 
 
 # Parse CLI Arguments
 def parse_cli_args():
-    parser = argparse.ArgumentParser(prog='google-mc-sheets.py',
+    parser = argparse.ArgumentParser(prog='google-mc-c2c-data-import.py',
                                      usage='%(prog)s -d <mc report directory>\nThis creates an instance mapping between cloud providers and GCP')
     parser.add_argument('-d', metavar='Data Directory',
                         help='Directory containing MC report output or AWS CUR data.',
@@ -987,7 +977,7 @@ def main():
         if args.a is True:
             looker_template_id = default_cur_looker_template_id
 
-    print(f"Migration Center Pricing Report to Google sheets, {version}")
+    print(f"Migration Center C2C Data Import, {version}")
 
     if args.c is not None:
         customer_name = args.c
@@ -1065,18 +1055,14 @@ def main():
         else:
             customer_name = "No Name Customer, Inc."
 
-        if enable_bq_import is True:
+        if enable_bq_import is True and enable_cur_import is False:
             print("Migration Center Data import...")
             import_mc_into_bq(mc_reports_directory, gcp_project_id, bq_dataset_name, bq_table_prefix,
                                service_account_key, customer_name, display_looker, looker_template_id)
 
         if enable_bq_import is True and enable_cur_import is True:
-            import_mc_into_bq(mc_reports_directory, gcp_project_id, bq_dataset_name, bq_table_prefix,
-                               service_account_key, customer_name, display_looker, looker_template_id)
-
-            import_cur_into_bq(mc_reports_directory, gcp_project_id, bq_dataset_name, bq_table_prefix,
-                               service_account_key,
-                               customer_name, False, "")
+            print("Unable to import Migration Center & AWS CUR data at the same time. Please do each separately.")
+            exit()
 
         if enable_cur_import is True and enable_bq_import is False:
             print("AWS CUR import...")
