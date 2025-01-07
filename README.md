@@ -52,7 +52,16 @@ Once you have a project setup, you can run the following to authenticate against
 ```shell
 $ gcloud auth login
 $ gcloud config set project <PROJECT-ID>
-$ gcloud services enable drive.googleapis.com sheets.googleapis.com bigquery.googleapis.com
+$ gcloud services enable drive.googleapis.com sheets.googleapis.com
+$ gcloud auth application-default login --scopes='https://www.googleapis.com/auth/drive','https://www.googleapis.com/auth/cloud-platform'
+```
+
+If you need to save the data to Big Query, then you can authenticate using the following commands:
+
+```shell
+$ gcloud auth login
+$ gcloud config set project <PROJECT-ID>
+$ gcloud services enable bigquery.googleapis.com
 $ gcloud auth application-default login --scopes='https://www.googleapis.com/auth/drive','https://www.googleapis.com/auth/cloud-platform'
 ```
 
