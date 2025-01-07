@@ -13,7 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# Migration Pricing Reports to Google Sheets
+# Migration Pricing Reports C2C Data Import
 
 # v0.2
 # Google
@@ -977,7 +977,7 @@ def main():
         if args.a is True:
             looker_template_id = default_cur_looker_template_id
 
-    print(f"Migration Center Pricing Report to Google sheets, {version}")
+    print(f"Migration Center C2C Data Import, {version}")
 
     if args.c is not None:
         customer_name = args.c
