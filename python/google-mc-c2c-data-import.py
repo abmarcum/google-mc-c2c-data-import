@@ -1055,7 +1055,7 @@ def main():
         else:
             customer_name = "No Name Customer, Inc."
 
-        if enable_bq_import is True:
+        if enable_bq_import is True and enable_cur_import is False:
             print("Migration Center Data import...")
             import_mc_into_bq(mc_reports_directory, gcp_project_id, bq_dataset_name, bq_table_prefix,
                                service_account_key, customer_name, display_looker, looker_template_id)
