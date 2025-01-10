@@ -516,13 +516,15 @@ def generate_bq_pivot_table_request_sum(data_source_id, row_col_name, value_col_
                                             'dataSourceColumnReference': {
                                                 'name': row_col_name,
                                             },
-                                            "sortOrder": "DESCENDING"
+                                            "sortOrder": "DESCENDING",
+                                            "valueBucket": {}
                                         },
                                         'values': {
                                             'summarizeFunction': 'SUM',
                                             'dataSourceColumnReference': {
                                                 'name': value_col_name
-                                            }
+                                            },
+                                            'name': 'Total Cost'
                                         },
                                         'valueLayout': 'HORIZONTAL'
                                     }
@@ -1128,15 +1130,6 @@ def main():
             bq_tables.append(bq_table_prefix)
             overview_worksheets_name = "AWS Overview"
 
-        print(
-            "\nIMPORTANT: All Big Query tables will be REPLACED! Please Ctrl-C in the next 5 seconds if you wish to abort.\n")
-        time.sleep(5)
-        print("NOTE: Using this option will NOT automatically create a Google Sheets with your Migration Center Data.")
-        print(
-            "Once the BQ import is complete, you will need to manually connect a Google Sheets to the Big Query tables using 'Data' -> 'Data Connectors' -> 'Connect to Biq Query'.")
-        print(
-            "Complete Data Connector instructions can be found here: https://support.google.com/docs/answer/9702507\n")
-
         if args.k is not None:
             service_account_key = args.k
             print("Using Google Service Account key: " + service_account_key)
@@ -1183,43 +1176,107 @@ def main():
             else:
                 sheets_id = ""
 
-            pivot_table_location = [0, 0]
-            if enable_bq_import is True:
-                overview_worksheets_name = "GCP Overview"
-                row_col_name = "GCP_Service"
-                value_col_name = "GCP_Cost"
-
-            if enable_cur_import is True:
-                overview_worksheets_name = "AWS Overview"
-                row_col_name = "lineItem_ProductCode"
-                value_col_name = "lineItem_UnblendedCost"
-
+            # Create New Google Sheet
             spreadsheet, credentials = create_google_sheets(customer_name, sheets_email_addresses, service_account_key,
                                                             sheets_id)
 
-            overview_worksheet = spreadsheet.add_worksheet(overview_worksheets_name, 60, 15)
-            overview_worksheet_id = overview_worksheet._properties['sheetId']
-
-            # Delete default worksheet
-            worksheet = spreadsheet.worksheet("Sheet1")
-            spreadsheet.del_worksheet(worksheet)
-
-            # create_connected_sheets(gcp_project_id, bq_dataset_name, bq_tables, spreadsheet, credentials)
             data_source_ids = []
+            worksheet_names = []
+
+            # Connect each BG Table to a Worksheet
             for bq_table in bq_tables:
                 response = spreadsheet.batch_update(connect_bq_to_sheets(gcp_project_id, bq_dataset_name, bq_table))
-                # print(res['dataSource']['dataSourceId'])
-                # print(res)
                 data_source_ids.append(response['replies'][0]['addDataSource']['dataSource']['dataSourceId'])
 
-            data_source_id = data_source_ids[0]
+            pivot_table_location = [0, 0]
+            if enable_bq_import is True:
+                overview_worksheets_name = "GCP Overview"
+                unmapped_worksheets_name = "AWS Unmapped Overview"
+                overview_row_col_name = "GCP_Service"
+                overview_value_col_name = "GCP_Cost"
 
-            response = spreadsheet.batch_update(generate_bq_pivot_table_request_sum(data_source_id, row_col_name, value_col_name, overview_worksheet_id,
-                                                pivot_table_location))
+                unmapped_row_col_name = "lineItem_ProductCode"
+                unmapped_value_col_name = "lineItem_UnblendedCost"
 
-            spreadsheet_url = 'https://docs.google.com/spreadsheets/d/%s' % spreadsheet.id
+                # Create Overview Worksheet in Sheets
+                overview_worksheet = spreadsheet.add_worksheet(overview_worksheets_name, 60, 15)
+                overview_worksheet_id = overview_worksheet._properties['sheetId']
 
-            print("Migration Center Pricing Report for " + customer_name + ": " + spreadsheet_url)
+                # Create AWS Unmapped Worksheet in Sheets
+                unmapped_worksheet = spreadsheet.add_worksheet(unmapped_worksheets_name, 60, 15)
+                unmapped_worksheet_id = unmapped_worksheet._properties['sheetId']
+
+                worksheet_names.append(overview_worksheet)
+                worksheet_names.append(unmapped_worksheet)
+
+                # worksheet_names.extend(bq_tables)
+
+                # Add Cost sums to Overview Worksheet
+                response = spreadsheet.batch_update(
+                    generate_bq_pivot_table_request_sum(data_source_ids[0], overview_row_col_name, overview_value_col_name,
+                                                        overview_worksheet_id,
+                                                        pivot_table_location))
+
+                # Add Cost sums to AWS Unmapped Worksheet
+                response = spreadsheet.batch_update(
+                    generate_bq_pivot_table_request_sum(data_source_ids[1], unmapped_row_col_name, unmapped_value_col_name,
+                                                        unmapped_worksheet_id,
+                                                        pivot_table_location))
+
+                # Change Overview Cost Totals to Currency format
+                overview_worksheet.format("B", {
+                    "numberFormat": {"type": "CURRENCY"}
+                })
+
+                # Change Unmapped Cost Totals to Currency format
+                unmapped_worksheet.format("B", {
+                    "numberFormat": {"type": "CURRENCY"}
+                })
+
+                first_col = 0
+                last_col = 10
+
+                # Autosize first cols in Overview worksheet
+                res = spreadsheet.batch_update(autosize_worksheet(overview_worksheet_id, first_col, last_col))
+
+                # Autosize first cols in Unmapped worksheet
+                res = spreadsheet.batch_update(autosize_worksheet(unmapped_worksheet_id, first_col, last_col))
+
+        if enable_cur_import is True:
+                overview_worksheets_name = "AWS Overview"
+                overview_row_col_name = "lineItem_ProductCode"
+                overview_value_col_name = "lineItem_UnblendedCost"
+
+                # Create Overview Worksheet in Sheets
+                overview_worksheet = spreadsheet.add_worksheet(overview_worksheets_name, 60, 15)
+                overview_worksheet_id = overview_worksheet._properties['sheetId']
+
+                # Add worksheet names to list for future sorting
+                worksheet_names.append(overview_worksheet)
+                # worksheet_names.extend(bq_tables)
+
+                # Add Cost sums to Overview Worksheet
+                response = spreadsheet.batch_update(
+                    generate_bq_pivot_table_request_sum(data_source_ids[0], overview_row_col_name, overview_value_col_name,
+                                                        overview_worksheet_id,
+                                                        pivot_table_location))
+
+                # Autosize first cols in Overview worksheet
+                first_col = 0
+                last_col = 10
+                res = spreadsheet.batch_update(autosize_worksheet(overview_worksheet_id, first_col, last_col))
+
+
+        # Delete default worksheet
+        worksheet = spreadsheet.worksheet("Sheet1")
+        spreadsheet.del_worksheet(worksheet)
+
+        # Reorder worksheet tabs based on mc_names order
+        spreadsheet.reorder_worksheets(worksheet_names)
+
+        spreadsheet_url = 'https://docs.google.com/spreadsheets/d/%s' % spreadsheet.id
+
+        print("Migration Center Pricing Report for " + customer_name + ": " + spreadsheet_url)
 
 
 if __name__ == "__main__":
