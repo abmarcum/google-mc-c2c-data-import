@@ -83,9 +83,9 @@ def check_csv_size(mc_reports_directory):
 # Create Initial Google Sheets
 def create_google_sheets(customer_name, sheets_email_addresses, service_account_key, sheets_id):
     if sheets_id == "":
-        print("Creating new Google Sheets...")
+        print("\nCreating new Google Sheets...")
     else:
-        print("Updating Google Sheets: " + sheets_id)
+        print("\nUpdating Google Sheets: " + sheets_id)
 
     scope = ["https://www.googleapis.com/auth/drive", "https://www.googleapis.com/auth/spreadsheets"]
     sheets_title = ("Migration Center Pricing Report: " + customer_name + ' - ' + datetime)
@@ -468,6 +468,80 @@ def autosize_worksheet(sheet_id, first_col, last_col):
 
     time.sleep(1)
     return body
+
+
+# Create API Request to Connect BQ Table to Google Sheets
+def connect_bq_to_sheets(gcp_project_id, bq_dataset_name, bq_table):
+    body = {
+        "requests": [
+            {
+                "addDataSource": {
+                    "dataSource": {
+                        "spec": {
+                            "bigQuery": {
+                                "projectId": gcp_project_id,
+                                "tableSpec": {
+                                    "tableProjectId": gcp_project_id,
+                                    "datasetId": bq_dataset_name,
+                                    "tableId": bq_table
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        ]
+    }
+
+    time.sleep(1)
+    return body
+
+
+# Create Pivot table with sums for Google Sheets
+def generate_bq_pivot_table_request_sum(data_source_id, row_col_name, value_col_name, location_spreadsheet,
+                                        pivot_table_location):
+    # Google Sheets Pivot Table API: https://developers.google.com/sheets/api/samples/pivot-tables
+
+    pivot_table_body = {
+        "requests": [
+            {
+                'updateCells': {
+                    'rows': [
+                        {
+                            'values': [
+                                {
+                                    'pivotTable': {
+                                        'dataSourceId': data_source_id,
+                                        'rows': {
+                                            'dataSourceColumnReference': {
+                                                'name': row_col_name,
+                                            },
+                                            "sortOrder": "DESCENDING"
+                                        },
+                                        'values': {
+                                            'summarizeFunction': 'SUM',
+                                            'dataSourceColumnReference': {
+                                                'name': value_col_name
+                                            }
+                                        },
+                                        'valueLayout': 'HORIZONTAL'
+                                    }
+                                }
+                            ]
+                        },
+                    ],
+                    'start': {
+                        'sheetId': location_spreadsheet,
+                        'rowIndex': pivot_table_location[1],
+                        'columnIndex': pivot_table_location[0]
+                    },
+                    'fields': 'pivotTable'
+                }
+            }
+        ]
+    }
+
+    return pivot_table_body
 
 
 # Import mc data from provided reports directory
@@ -957,6 +1031,8 @@ def parse_cli_args():
                         help='Display Looker Report URL. Migration Center or AWS CUR BQ Import must be enabled! ')
     parser.add_argument('-r', metavar='Looker Templ ID', required=False,
                         help='Replaces Default Looker Report Template ID')
+    parser.add_argument('-n', action='store_true', required=False,
+                        help='Create a Google Connected Sheets to newly created Big Query')
     parser.add_argument('-i', metavar='BQ Connect Info', required=False,
                         help='BQ Connection Info: Format is <GCP Project ID>.<BQ Dataset Name>.<BQ Table Prefix>, i.e. googleproject.bqdataset.bqtable_prefix')
     return parser.parse_args()
@@ -969,6 +1045,9 @@ def main():
     enable_bq_import = args.b
     mc_reports_directory = args.d
     display_looker = args.l
+    connect_sheets_bq = args.n
+    sheets_emails = args.e
+
     if args.r is not None:
         looker_template_id = args.r
     else:
@@ -992,11 +1071,14 @@ def main():
         print("Migration Center Reports directory not defined, exiting!")
         exit()
 
+    if connect_sheets_bq is True and (enable_bq_import is False and enable_cur_import is False):
+        print("Must enable Big Query with -b or -a before creating a Connected BQ Google Sheets!")
+        exit()
+
     if enable_bq_import is not True and enable_cur_import is not True:
         check_csv_size(mc_reports_directory)
 
-        if args.e is not None:
-            sheets_emails = args.e
+        if sheets_emails is not None:
             sheets_email_addresses = sheets_emails.split(",")
             print("Sharing Sheets with: ")
             for email in sheets_email_addresses:
@@ -1035,14 +1117,25 @@ def main():
         print("Importing data into Big Query...")
         print(f"GCP Project ID: {gcp_project_id}")
         print(f"BQ Dataset Name: {bq_dataset_name}")
-        print(f"BQ Table Prefix: {bq_table_prefix}")
+        bq_tables = []
+        if enable_bq_import is True:
+            print(f"BQ Table Prefix: {bq_table_prefix}")
+            for table in list(mc_names.keys()):
+                bq_tables.append(f'{bq_table_prefix}{table}')
+
+        if enable_cur_import is True:
+            print(f"BQ Table: {bq_table_prefix}")
+            bq_tables.append(bq_table_prefix)
+            overview_worksheets_name = "AWS Overview"
+
         print(
             "\nIMPORTANT: All Big Query tables will be REPLACED! Please Ctrl-C in the next 5 seconds if you wish to abort.\n")
         time.sleep(5)
         print("NOTE: Using this option will NOT automatically create a Google Sheets with your Migration Center Data.")
         print(
             "Once the BQ import is complete, you will need to manually connect a Google Sheets to the Big Query tables using 'Data' -> 'Data Connectors' -> 'Connect to Biq Query'.")
-        print("Complete Data Connector instructions can be found here: https://support.google.com/docs/answer/9702507\n")
+        print(
+            "Complete Data Connector instructions can be found here: https://support.google.com/docs/answer/9702507\n")
 
         if args.k is not None:
             service_account_key = args.k
@@ -1058,7 +1151,7 @@ def main():
         if enable_bq_import is True and enable_cur_import is False:
             print("Migration Center Data import...")
             import_mc_into_bq(mc_reports_directory, gcp_project_id, bq_dataset_name, bq_table_prefix,
-                               service_account_key, customer_name, display_looker, looker_template_id)
+                              service_account_key, customer_name, display_looker, looker_template_id)
 
         if enable_bq_import is True and enable_cur_import is True:
             print("Unable to import Migration Center & AWS CUR data at the same time. Please do each separately.")
@@ -1069,6 +1162,64 @@ def main():
             import_cur_into_bq(mc_reports_directory, gcp_project_id, bq_dataset_name, bq_table_prefix,
                                service_account_key,
                                customer_name, display_looker, looker_template_id)
+
+        if args.n is True:
+            if sheets_emails is not None:
+                sheets_email_addresses = sheets_emails.split(",")
+                print("Sharing Sheets with: ")
+                for email in sheets_email_addresses:
+                    print(email)
+            else:
+                sheets_email_addresses = ""
+
+            if args.k is not None:
+                service_account_key = args.k
+                print("Using Google Service Account key: " + service_account_key)
+            else:
+                service_account_key = ""
+
+            if args.s is not None:
+                sheets_id = args.s
+            else:
+                sheets_id = ""
+
+            pivot_table_location = [0, 0]
+            if enable_bq_import is True:
+                overview_worksheets_name = "GCP Overview"
+                row_col_name = "GCP_Service"
+                value_col_name = "GCP_Cost"
+
+            if enable_cur_import is True:
+                overview_worksheets_name = "AWS Overview"
+                row_col_name = "lineItem_ProductCode"
+                value_col_name = "lineItem_UnblendedCost"
+
+            spreadsheet, credentials = create_google_sheets(customer_name, sheets_email_addresses, service_account_key,
+                                                            sheets_id)
+
+            overview_worksheet = spreadsheet.add_worksheet(overview_worksheets_name, 60, 15)
+            overview_worksheet_id = overview_worksheet._properties['sheetId']
+
+            # Delete default worksheet
+            worksheet = spreadsheet.worksheet("Sheet1")
+            spreadsheet.del_worksheet(worksheet)
+
+            # create_connected_sheets(gcp_project_id, bq_dataset_name, bq_tables, spreadsheet, credentials)
+            data_source_ids = []
+            for bq_table in bq_tables:
+                response = spreadsheet.batch_update(connect_bq_to_sheets(gcp_project_id, bq_dataset_name, bq_table))
+                # print(res['dataSource']['dataSourceId'])
+                # print(res)
+                data_source_ids.append(response['replies'][0]['addDataSource']['dataSource']['dataSourceId'])
+
+            data_source_id = data_source_ids[0]
+
+            response = spreadsheet.batch_update(generate_bq_pivot_table_request_sum(data_source_id, row_col_name, value_col_name, overview_worksheet_id,
+                                                pivot_table_location))
+
+            spreadsheet_url = 'https://docs.google.com/spreadsheets/d/%s' % spreadsheet.id
+
+            print("Migration Center Pricing Report for " + customer_name + ": " + spreadsheet_url)
 
 
 if __name__ == "__main__":
