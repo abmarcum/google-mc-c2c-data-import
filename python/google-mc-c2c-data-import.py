@@ -83,11 +83,12 @@ def check_csv_size(mc_reports_directory):
 # Create Initial Google Sheets
 def create_google_sheets(customer_name, sheets_email_addresses, service_account_key, sheets_id):
     if sheets_id == "":
-        print("\nCreating new Google Sheets...")
+        # print("\nCreating new Google Sheets...")
+        nothing = 0
     else:
         print("\nUpdating Google Sheets: " + sheets_id)
 
-    scope = ["https://www.googleapis.com/auth/drive", "https://www.googleapis.com/auth/spreadsheets"]
+    scope = ['https://www.googleapis.com/auth/drive', 'https://www.googleapis.com/auth/spreadsheets']
     sheets_title = ("Migration Center Pricing Report: " + customer_name + ' - ' + datetime)
 
     # Use provided Google Service Account Key, otherwise try to use gcloud auth key to authenticate
@@ -510,15 +511,28 @@ def generate_bq_pivot_table_request(data_source_id, row_col_name, value_col_name
                         {
                             'values': [
                                 {
-                                    'pivotTable': {
-                                        'dataSourceId': data_source_id,
-                                        'rows': {
-                                            'dataSourceColumnReference': {
-                                                'name': row_col_name,
+                                    "pivotTable": {
+                                        "dataSourceId": data_source_id,
+                                        "rows": {
+                                            "dataSourceColumnReference": {
+                                                "name": row_col_name,
                                             },
                                             "sortOrder": "DESCENDING",
-                                            'showTotals': False,
+                                            "showTotals": False,
                                             "valueBucket": {}
+                                        },
+                                        "filterSpecs": {
+                                            "filterCriteria": {
+                                                "condition": {
+                                                    "type": "NUMBER_GREATER",
+                                                    "values": [{
+                                                        "userEnteredValue": "0"
+                                                    }]
+                                                }
+                                            },
+                                            "dataSourceColumnReference": {
+                                                "name": value_col_name,
+                                            },
                                         },
                                         'values': {
                                             'summarizeFunction': function,
@@ -569,6 +583,19 @@ def generate_bq_pie_table_request(spreadsheet, chart_title, data_source_id, ref_
                                     "aggregateType": "SUM"
                                 },
                                 "threeDimensional": True
+                            },
+                            "filterSpecs": {
+                                "filterCriteria": {
+                                    "condition": {
+                                        "type": "NUMBER_GREATER",
+                                        "values": [{
+                                            "userEnteredValue": "0"
+                                        }]
+                                    }
+                                },
+                                "dataSourceColumnReference": {
+                                    "name": ref_col
+                                },
                             },
                             "dataSourceChartProperties": {
                                 "dataSourceId": data_source_id
@@ -1421,7 +1448,7 @@ def main():
 
             spreadsheet_url = "https://docs.google.com/spreadsheets/d/%s" % spreadsheet.id
 
-            print("Migration Center Pricing Report for " + customer_name + ": " + spreadsheet_url)
+            print("Migration Center Sheets: " + spreadsheet_url)
 
 
 if __name__ == "__main__":
