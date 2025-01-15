@@ -73,7 +73,7 @@ def check_csv_size(mc_reports_directory):
                 total_cells = number_of_rows * number_of_columns
                 if total_cells > 5000000:
                     print(file + " exceeds the 5 million cell Google Sheets limit (" + str(
-                        total_cells) + ") and therefor cannot be imported through the Google Sheets API. Consider using the -b argument to import into Big Query instead. NOTE: Google Sheets will not be created with the -b option. Exiting now due to Google Sheets size limitations.")
+                        total_cells) + ") and therefor cannot be imported through the Google Sheets API. Consider using the -b & -n argument to import into Big Query & Sheets instead.")
                     exit()
     else:
         print("No CSV files found in " + mc_reports_directory + "! Exiting!")
@@ -140,7 +140,7 @@ def generate_pivot_table_request_sum(data_spreadsheet, location_spreadsheet, las
                                                 'rows': [
                                                     {
                                                         'sourceColumnOffset': rows_column_offset,
-                                                        'showTotals': True,
+                                                        'showTotals': False,
                                                         "sortOrder": "DESCENDING",
                                                         "valueBucket": {}
                                                     }
@@ -188,7 +188,7 @@ def generate_pivot_table_request_sum(data_spreadsheet, location_spreadsheet, las
                                                 'rows': [
                                                     {
                                                         'sourceColumnOffset': rows_column_offset,
-                                                        'showTotals': True,
+                                                        'showTotals': False,
                                                         "sortOrder": "DESCENDING",
                                                         "valueBucket": {}
                                                     }
@@ -241,7 +241,7 @@ def generate_pivot_table_request_sum(data_spreadsheet, location_spreadsheet, las
                                             'rows': [
                                                 {
                                                     'sourceColumnOffset': rows_column_offset,
-                                                    'showTotals': True,
+                                                    'showTotals': False,
                                                     "sortOrder": "DESCENDING",
                                                     "valueBucket": {}
                                                 },
@@ -498,8 +498,8 @@ def connect_bq_to_sheets(gcp_project_id, bq_dataset_name, bq_table):
 
 
 # Create Pivot table with sums for Google Sheets
-def generate_bq_pivot_table_request_sum(data_source_id, row_col_name, value_col_name, location_spreadsheet,
-                                        pivot_table_location):
+def generate_bq_pivot_table_request(data_source_id, row_col_name, value_col_name, location_spreadsheet,
+                                    pivot_table_location, function):
     # Google Sheets Pivot Table API: https://developers.google.com/sheets/api/samples/pivot-tables
 
     pivot_table_body = {
@@ -517,14 +517,15 @@ def generate_bq_pivot_table_request_sum(data_source_id, row_col_name, value_col_
                                                 'name': row_col_name,
                                             },
                                             "sortOrder": "DESCENDING",
+                                            'showTotals': False,
                                             "valueBucket": {}
                                         },
                                         'values': {
-                                            'summarizeFunction': 'SUM',
+                                            'summarizeFunction': function,
                                             'dataSourceColumnReference': {
                                                 'name': value_col_name
                                             },
-                                            'name': 'Total Cost'
+                                            'name': 'Total'
                                         },
                                         'valueLayout': 'HORIZONTAL'
                                     }
@@ -544,6 +545,216 @@ def generate_bq_pivot_table_request_sum(data_source_id, row_col_name, value_col_
     }
 
     return pivot_table_body
+
+
+def generate_bq_pie_table_request(spreadsheet, chart_title, data_source_id, ref_col, series_col, position_data):
+    pie_chart_body = {
+        "requests": [
+            {
+                "addChart": {
+                    "chart": {
+                        "spec": {
+                            "title": chart_title,
+                            "pieChart": {
+                                "legendPosition": "LABELED_LEGEND",
+                                "domain": {
+                                    "columnReference": {
+                                        "name": ref_col
+                                    },
+                                },
+                                "series": {
+                                    "columnReference": {
+                                        "name": series_col
+                                    },
+                                    "aggregateType": "SUM"
+                                },
+                                "threeDimensional": True
+                            },
+                            "dataSourceChartProperties": {
+                                "dataSourceId": data_source_id
+                            }
+                        },
+                        "position": {
+                            "overlayPosition": {
+                                "anchorCell": {
+                                    "sheetId": spreadsheet,
+                                    "columnIndex": position_data[0],
+                                    "rowIndex": position_data[1],
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        ]
+    }
+    return pie_chart_body
+
+
+def generate_bq_mc_sheets(spreadsheet, worksheet_names, data_source_ids, pivot_table_location):
+    overview_worksheets_name = "GCP Overview"
+    unmapped_worksheets_name = "AWS Unmapped Overview"
+    overview_row_col_name = "GCP_Service"
+    overview_value_col_name = "GCP_Cost"
+
+    unmapped_row_col_name = "lineItem_ProductCode"
+    unmapped_value_col_name = "lineItem_UnblendedCost"
+
+    # Create Overview Worksheet in Sheets
+    overview_worksheet = spreadsheet.add_worksheet(overview_worksheets_name, 60, 15)
+    overview_worksheet_id = overview_worksheet._properties['sheetId']
+
+    # Create AWS Unmapped Worksheet in Sheets
+    unmapped_worksheet = spreadsheet.add_worksheet(unmapped_worksheets_name, 60, 15)
+    unmapped_worksheet_id = unmapped_worksheet._properties['sheetId']
+
+    worksheet_names.append(overview_worksheet)
+    worksheet_names.append(unmapped_worksheet)
+
+    # worksheet_names.extend(bq_tables)
+
+    overview_worksheet.batch_update([{
+        'range': "A1:B1",
+        'values': [["GCP Total Cost", "AWS Unmapped Cost"]],
+    }, {
+        'range': "A2:B2",
+        'values': [["=SUM(E2:E)", "=SUM('AWS Unmapped Overview'!B2:B)"]],
+    }]
+        , value_input_option="USER_ENTERED"
+    )
+
+    # Add Cost sums to Overview Worksheet
+    pivot_table_location = [
+        3,  # Column D
+        0  # Row 1
+    ]
+    response = spreadsheet.batch_update(
+        generate_bq_pivot_table_request(data_source_ids[0], overview_row_col_name,
+                                        overview_value_col_name,
+                                        overview_worksheet_id,
+                                        pivot_table_location,
+                                        "SUM"
+                                        ))
+
+    # Add Instance Count to Overview Worksheet
+    pivot_table_location = [
+        6,  # Column G
+        0  # Row 1
+    ]
+    response = spreadsheet.batch_update(
+        generate_bq_pivot_table_request(data_source_ids[0], "Destination_Shape",
+                                        "Destination_Shape",
+                                        overview_worksheet_id,
+                                        pivot_table_location,
+                                        "COUNTA"
+                                        ))
+
+    # Add Cost sums to AWS Unmapped Worksheet
+    pivot_table_location = [
+        0,  # Column D
+        0  # Row 1
+    ]
+    response = spreadsheet.batch_update(
+        generate_bq_pivot_table_request(data_source_ids[1], unmapped_row_col_name,
+                                        unmapped_value_col_name,
+                                        unmapped_worksheet_id,
+                                        pivot_table_location,
+                                        "SUM"
+                                        ))
+
+    # Add Piechart for GCP Services
+    chart_title = "GCP Services Breakdown"
+
+    position_data = [
+        9,  # Column J
+        0  # Row 1
+    ]
+
+    res = spreadsheet.batch_update(
+        generate_bq_pie_table_request(overview_worksheet_id, chart_title, data_source_ids[0], overview_row_col_name,
+                                      overview_value_col_name, position_data)
+    )
+
+    # Add Piechart for Instances
+    chart_title = "GCP Instance Breakdown"
+
+    position_data = [
+        9,  # Column J
+        21  # Row 20
+    ]
+
+    res = spreadsheet.batch_update(
+        generate_bq_pie_table_request(overview_worksheet_id, chart_title, data_source_ids[0], "Destination_Shape",
+                                      overview_value_col_name, position_data)
+    )
+
+    # Add Piechart for AWS Unmapped Services
+    chart_title = "AWS Unmapped Services Breakdown"
+
+    position_data = [
+        3,  # Column D
+        0  # Row 1
+    ]
+
+    res = spreadsheet.batch_update(
+        generate_bq_pie_table_request(unmapped_worksheet_id, chart_title, data_source_ids[1], unmapped_row_col_name,
+                                      unmapped_value_col_name, position_data)
+    )
+
+    # Set Overview Cost Totals to Bold
+    overview_worksheet.format("A1:B1", {
+        "textFormat": {"bold": True}
+    })
+
+    # Set Overview Cost Totals to Currency
+    overview_worksheet.format("A2:B2", {
+        "numberFormat": {"type": "CURRENCY"}
+    })
+
+    # Change Overview Cost Totals to Currency format
+    overview_worksheet.format("E", {
+        "numberFormat": {"type": "CURRENCY"}
+    })
+
+    # Change Unmapped Cost Totals to Currency format
+    unmapped_worksheet.format("B", {
+        "numberFormat": {"type": "CURRENCY"}
+    })
+
+    # Autosize first cols in Overview worksheet
+    first_col = 0
+    last_col = 10
+    res = spreadsheet.batch_update(autosize_worksheet(overview_worksheet_id, first_col, last_col))
+
+    # Autosize first cols in Unmapped worksheet
+    res = spreadsheet.batch_update(autosize_worksheet(unmapped_worksheet_id, first_col, last_col))
+
+
+def generate_bq_cur_sheets(spreadsheet, worksheet_names, data_source_ids, pivot_table_location):
+    overview_worksheets_name = "AWS Overview"
+    overview_row_col_name = "lineItem_ProductCode"
+    overview_value_col_name = "lineItem_UnblendedCost"
+
+    # Create Overview Worksheet in Sheets
+    overview_worksheet = spreadsheet.add_worksheet(overview_worksheets_name, 60, 15)
+    overview_worksheet_id = overview_worksheet._properties['sheetId']
+
+    # Add worksheet names to list for future sorting
+    worksheet_names.append(overview_worksheet)
+    # worksheet_names.extend(bq_tables)
+
+    # Add Cost sums to Overview Worksheet
+    response = spreadsheet.batch_update(
+        generate_bq_pivot_table_request(data_source_ids[0], overview_row_col_name, overview_value_col_name,
+                                        overview_worksheet_id,
+                                        pivot_table_location,
+                                        "SUM"
+                                        ))
+
+    # Autosize first cols in Overview worksheet
+    first_col = 0
+    last_col = 10
+    res = spreadsheet.batch_update(autosize_worksheet(overview_worksheet_id, first_col, last_col))
 
 
 # Import mc data from provided reports directory
@@ -891,7 +1102,7 @@ def import_mc_into_bq(mc_reports_directory, gcp_project_id, bq_dataset_name, bq_
 
         looker_report_url = f"{looker_url_prefix}{looker_template_id}&r.reportName={looker_report_name}&ds.ds0.connector=bigQuery&ds.ds0.datasourceName={looker_ds0_bq_datasource_name}&ds.ds0.projectId={looker_ds0_project_id}&ds.ds0.type=TABLE&ds.ds0.datasetId={looker_ds0_bq_dataset}&ds.ds0.tableId={looker_ds0_bq_table}&ds.ds1.connector=bigQuery&ds.ds1.datasourceName={looker_ds1_bq_datasource_name}&ds.ds1.projectId={looker_ds1_project_id}&ds.ds1.type=TABLE&ds.ds1.datasetId={looker_ds1_bq_dataset}&ds.ds1.tableId={looker_ds1_bq_table}"
 
-        print(f"Looker URL: {looker_report_url}")
+        print(f"\nLooker URL: {looker_report_url}")
 
 
 def import_cur_into_bq(mc_reports_directory, gcp_project_id, bq_dataset_name, bq_table_prefix, service_account_key,
@@ -1186,97 +1397,31 @@ def main():
             # Connect each BG Table to a Worksheet
             for bq_table in bq_tables:
                 response = spreadsheet.batch_update(connect_bq_to_sheets(gcp_project_id, bq_dataset_name, bq_table))
+                bq_table_worksheet_id = spreadsheet.worksheet(bq_table)
+
+                # Autosize first cols in BQ table worksheet
+                # res = spreadsheet.batch_update(autosize_worksheet(bq_table_worksheet_id, 0, 10))
+
+                # Get dataource ID from batch update response
                 data_source_ids.append(response['replies'][0]['addDataSource']['dataSource']['dataSourceId'])
 
             pivot_table_location = [0, 0]
             if enable_bq_import is True:
-                overview_worksheets_name = "GCP Overview"
-                unmapped_worksheets_name = "AWS Unmapped Overview"
-                overview_row_col_name = "GCP_Service"
-                overview_value_col_name = "GCP_Cost"
+                generate_bq_mc_sheets(spreadsheet, worksheet_names, data_source_ids, pivot_table_location)
 
-                unmapped_row_col_name = "lineItem_ProductCode"
-                unmapped_value_col_name = "lineItem_UnblendedCost"
+            if enable_cur_import is True:
+                generate_bq_cur_sheets(spreadsheet, worksheet_names, data_source_ids, pivot_table_location)
 
-                # Create Overview Worksheet in Sheets
-                overview_worksheet = spreadsheet.add_worksheet(overview_worksheets_name, 60, 15)
-                overview_worksheet_id = overview_worksheet._properties['sheetId']
+            # Delete default worksheet
+            worksheet = spreadsheet.worksheet("Sheet1")
+            spreadsheet.del_worksheet(worksheet)
 
-                # Create AWS Unmapped Worksheet in Sheets
-                unmapped_worksheet = spreadsheet.add_worksheet(unmapped_worksheets_name, 60, 15)
-                unmapped_worksheet_id = unmapped_worksheet._properties['sheetId']
+            # Reorder worksheet tabs based on mc_names order
+            spreadsheet.reorder_worksheets(worksheet_names)
 
-                worksheet_names.append(overview_worksheet)
-                worksheet_names.append(unmapped_worksheet)
+            spreadsheet_url = "https://docs.google.com/spreadsheets/d/%s" % spreadsheet.id
 
-                # worksheet_names.extend(bq_tables)
-
-                # Add Cost sums to Overview Worksheet
-                response = spreadsheet.batch_update(
-                    generate_bq_pivot_table_request_sum(data_source_ids[0], overview_row_col_name, overview_value_col_name,
-                                                        overview_worksheet_id,
-                                                        pivot_table_location))
-
-                # Add Cost sums to AWS Unmapped Worksheet
-                response = spreadsheet.batch_update(
-                    generate_bq_pivot_table_request_sum(data_source_ids[1], unmapped_row_col_name, unmapped_value_col_name,
-                                                        unmapped_worksheet_id,
-                                                        pivot_table_location))
-
-                # Change Overview Cost Totals to Currency format
-                overview_worksheet.format("B", {
-                    "numberFormat": {"type": "CURRENCY"}
-                })
-
-                # Change Unmapped Cost Totals to Currency format
-                unmapped_worksheet.format("B", {
-                    "numberFormat": {"type": "CURRENCY"}
-                })
-
-                first_col = 0
-                last_col = 10
-
-                # Autosize first cols in Overview worksheet
-                res = spreadsheet.batch_update(autosize_worksheet(overview_worksheet_id, first_col, last_col))
-
-                # Autosize first cols in Unmapped worksheet
-                res = spreadsheet.batch_update(autosize_worksheet(unmapped_worksheet_id, first_col, last_col))
-
-        if enable_cur_import is True:
-                overview_worksheets_name = "AWS Overview"
-                overview_row_col_name = "lineItem_ProductCode"
-                overview_value_col_name = "lineItem_UnblendedCost"
-
-                # Create Overview Worksheet in Sheets
-                overview_worksheet = spreadsheet.add_worksheet(overview_worksheets_name, 60, 15)
-                overview_worksheet_id = overview_worksheet._properties['sheetId']
-
-                # Add worksheet names to list for future sorting
-                worksheet_names.append(overview_worksheet)
-                # worksheet_names.extend(bq_tables)
-
-                # Add Cost sums to Overview Worksheet
-                response = spreadsheet.batch_update(
-                    generate_bq_pivot_table_request_sum(data_source_ids[0], overview_row_col_name, overview_value_col_name,
-                                                        overview_worksheet_id,
-                                                        pivot_table_location))
-
-                # Autosize first cols in Overview worksheet
-                first_col = 0
-                last_col = 10
-                res = spreadsheet.batch_update(autosize_worksheet(overview_worksheet_id, first_col, last_col))
-
-
-        # Delete default worksheet
-        worksheet = spreadsheet.worksheet("Sheet1")
-        spreadsheet.del_worksheet(worksheet)
-
-        # Reorder worksheet tabs based on mc_names order
-        spreadsheet.reorder_worksheets(worksheet_names)
-
-        spreadsheet_url = 'https://docs.google.com/spreadsheets/d/%s' % spreadsheet.id
-
-        print("Migration Center Pricing Report for " + customer_name + ": " + spreadsheet_url)
+            print("Migration Center Pricing Report for " + customer_name + ": " + spreadsheet_url)
 
 
 if __name__ == "__main__":
