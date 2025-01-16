@@ -43,10 +43,12 @@ if username == 'root':
     exit()
 
 # Order to sort worksheets and new names to use
-f = open('mappings.json', )
-mappings_file = json.load(f)
-mc_names = mappings_file["mc_names"]
-mc_column_names = mappings_file["mc_column_names"]
+f = open('settings.json', )
+settings_file = json.load(f)
+mc_names = settings_file["mc_names"]
+mc_column_names = settings_file["mc_column_names"]
+pivot_table_request = settings_file["pivot_table_request"]
+pie_chart_request = settings_file["pie_chart_request"]
 f.close()
 
 default_mc_looker_template_id = "421c8150-e7ad-4190-b044-6a18ecdbd391"
@@ -83,8 +85,7 @@ def check_csv_size(mc_reports_directory):
 # Create Initial Google Sheets
 def create_google_sheets(customer_name, sheets_email_addresses, service_account_key, sheets_id):
     if sheets_id == "":
-        # print("\nCreating new Google Sheets...")
-        nothing = 0
+        print("\nCreating new Google Sheets...")
     else:
         print("\nUpdating Google Sheets: " + sheets_id)
 
@@ -110,288 +111,6 @@ def create_google_sheets(customer_name, sheets_email_addresses, service_account_
         spreadsheet.share(shared_user, perm_type='user', role='writer', notify=False)
 
     return spreadsheet, credentials
-
-
-# Create Pivot table with sums for Google Sheets
-def generate_pivot_table_request_sum(data_spreadsheet, location_spreadsheet, last_data_column, last_data_row,
-                                     location_data,
-                                     rows_column_offset, second_rows_column_offset, values_column_offset,
-                                     values_column_offset_2nd):
-    # Google Sheets Pivot Table API: https://developers.google.com/sheets/api/samples/pivot-tables
-
-    # If 2nd rows for Pivot Table is empty, don't include it. Otherwise, do include.
-    if second_rows_column_offset is None:
-        if values_column_offset_2nd == 0:
-            pivot_table_body = {
-                "requests": [
-                    {
-                        'updateCells': {
-                            'rows': [
-                                {
-                                    'values': [
-                                        {
-                                            'pivotTable': {
-                                                'source': {
-                                                    'sheetId': data_spreadsheet,
-                                                    'startRowIndex': 0,
-                                                    'startColumnIndex': 0,
-                                                    'endRowIndex': last_data_row,
-                                                    'endColumnIndex': last_data_column
-                                                },
-                                                'rows': [
-                                                    {
-                                                        'sourceColumnOffset': rows_column_offset,
-                                                        'showTotals': False,
-                                                        "sortOrder": "DESCENDING",
-                                                        "valueBucket": {}
-                                                    }
-                                                ],
-                                                'values': [
-                                                    {
-                                                        "name": "Total Cost",
-                                                        'summarizeFunction': 'SUM',
-                                                        'sourceColumnOffset': values_column_offset
-                                                    }
-                                                ],
-                                                'valueLayout': 'HORIZONTAL'
-                                            }
-                                        }
-                                    ]
-                                },
-                            ],
-                            'start': {
-                                'sheetId': location_spreadsheet,
-                                'rowIndex': location_data[1],
-                                'columnIndex': location_data[0]
-                            },
-                            'fields': 'pivotTable'
-                        }
-                    }
-                ]
-            }
-        else:
-            pivot_table_body = {
-                "requests": [
-                    {
-                        'updateCells': {
-                            'rows': [
-                                {
-                                    'values': [
-                                        {
-                                            'pivotTable': {
-                                                'source': {
-                                                    'sheetId': data_spreadsheet,
-                                                    'startRowIndex': 0,
-                                                    'startColumnIndex': 0,
-                                                    'endRowIndex': last_data_row,
-                                                    'endColumnIndex': last_data_column
-                                                },
-                                                'rows': [
-                                                    {
-                                                        'sourceColumnOffset': rows_column_offset,
-                                                        'showTotals': False,
-                                                        "sortOrder": "DESCENDING",
-                                                        "valueBucket": {}
-                                                    }
-                                                ],
-                                                'values': [
-                                                    {
-                                                        "name": "GCP Cost",
-                                                        'summarizeFunction': 'SUM',
-                                                        'sourceColumnOffset': values_column_offset
-                                                    },
-                                                    {
-                                                        "name": "AWS Cost",
-                                                        'summarizeFunction': 'SUM',
-                                                        'sourceColumnOffset': values_column_offset_2nd
-                                                    },
-                                                ],
-                                                'valueLayout': 'HORIZONTAL'
-                                            }
-                                        }
-                                    ]
-                                },
-                            ],
-                            'start': {
-                                'sheetId': location_spreadsheet,
-                                'rowIndex': location_data[1],
-                                'columnIndex': location_data[0]
-                            },
-                            'fields': 'pivotTable'
-                        }
-                    }
-                ]
-            }
-    else:
-        pivot_table_body = {
-            "requests": [
-                {
-                    'updateCells': {
-                        'rows': [
-                            {
-                                'values': [
-                                    {
-                                        'pivotTable': {
-                                            'source': {
-                                                'sheetId': data_spreadsheet,
-                                                'startRowIndex': 0,
-                                                'startColumnIndex': 0,
-                                                'endRowIndex': last_data_row,
-                                                'endColumnIndex': last_data_column
-                                            },
-                                            'rows': [
-                                                {
-                                                    'sourceColumnOffset': rows_column_offset,
-                                                    'showTotals': False,
-                                                    "sortOrder": "DESCENDING",
-                                                    "valueBucket": {}
-                                                },
-                                                {
-                                                    'sourceColumnOffset': second_rows_column_offset,
-                                                    'showTotals': False,
-                                                    "sortOrder": "DESCENDING",
-                                                    "valueBucket": {}
-                                                }
-                                            ],
-                                            'values': [
-                                                {
-                                                    "name": "Total Cost",
-                                                    'summarizeFunction': 'SUM',
-                                                    'sourceColumnOffset': values_column_offset
-                                                }
-                                            ],
-                                            'valueLayout': 'HORIZONTAL'
-                                        }
-                                    }
-                                ]
-                            },
-                        ],
-                        'start': {
-                            'sheetId': location_spreadsheet,
-                            'rowIndex': location_data[1],
-                            'columnIndex': location_data[0]
-                        },
-                        'fields': 'pivotTable'
-                    }
-                }
-            ]
-        }
-
-    return pivot_table_body
-
-
-# Create Pivot table with counts for Google Sheets
-def generate_pivot_table_request_count(data_spreadsheet, location_spreadsheet, last_data_column, last_data_row,
-                                       location_data,
-                                       rows_column_offset, second_rows_column_offset, values_column_offset,
-                                       show_totals):
-    # Google Sheets Pivot Table API: https://developers.google.com/sheets/api/samples/pivot-tables
-
-    # If 2nd rows for Pivot Table is empty, don't include it. Otherwise, do include.
-    if second_rows_column_offset is None:
-        pivot_table_body = {
-            "requests": [
-                {
-                    'updateCells': {
-                        'rows': [
-                            {
-                                'values': [
-                                    {
-                                        'pivotTable': {
-                                            'source': {
-                                                'sheetId': data_spreadsheet,
-                                                'startRowIndex': 0,
-                                                'startColumnIndex': 0,
-                                                'endRowIndex': last_data_row,
-                                                'endColumnIndex': last_data_column
-                                            },
-                                            'rows': [
-                                                {
-                                                    'sourceColumnOffset': rows_column_offset,
-                                                    'showTotals': show_totals,
-                                                    "sortOrder": "DESCENDING",
-                                                    "valueBucket": {}
-                                                }
-                                            ],
-                                            'values': [
-                                                {
-                                                    "name": "Totals",
-                                                    'summarizeFunction': 'COUNTA',
-                                                    'sourceColumnOffset': values_column_offset
-                                                }
-                                            ],
-                                            'valueLayout': 'HORIZONTAL'
-                                        }
-                                    }
-                                ]
-                            },
-                        ],
-                        'start': {
-                            'sheetId': location_spreadsheet,
-                            'rowIndex': location_data[1],
-                            'columnIndex': location_data[0]
-                        },
-                        'fields': 'pivotTable'
-                    }
-                }
-            ]
-        }
-    else:
-        pivot_table_body = {
-            "requests": [
-                {
-                    'updateCells': {
-                        'rows': [
-                            {
-                                'values': [
-                                    {
-                                        'pivotTable': {
-                                            'source': {
-                                                'sheetId': data_spreadsheet,
-                                                'startRowIndex': 0,
-                                                'startColumnIndex': 0,
-                                                'endRowIndex': last_data_row,
-                                                'endColumnIndex': last_data_column
-                                            },
-                                            'rows': [
-                                                {
-                                                    'sourceColumnOffset': rows_column_offset,
-                                                    'showTotals': show_totals,
-                                                    "sortOrder": "DESCENDING",
-                                                    "valueBucket": {}
-                                                },
-                                                {
-                                                    'sourceColumnOffset': second_rows_column_offset,
-                                                    'showTotals': False,
-                                                    "sortOrder": "DESCENDING",
-                                                    "valueBucket": {}
-                                                }
-                                            ],
-                                            'values': [
-                                                {
-                                                    "name": "Total",
-                                                    'summarizeFunction': 'COUNTA',
-                                                    'sourceColumnOffset': values_column_offset
-                                                }
-                                            ],
-                                            'valueLayout': 'HORIZONTAL'
-                                        }
-                                    }
-                                ]
-                            },
-                        ],
-                        'start': {
-                            'sheetId': location_spreadsheet,
-                            'rowIndex': location_data[1],
-                            'columnIndex': location_data[0]
-                        },
-                        'fields': 'pivotTable'
-                    }
-                }
-            ]
-        }
-
-    return pivot_table_body
 
 
 def generate_pie_table_request(spreadsheet, chart_title, first_column, second_column, position_data):
@@ -499,66 +218,111 @@ def connect_bq_to_sheets(gcp_project_id, bq_dataset_name, bq_table):
 
 
 # Create Pivot table with sums for Google Sheets
-def generate_bq_pivot_table_request(data_source_id, row_col_name, value_col_name, location_spreadsheet,
-                                    pivot_table_location, function):
+def generate_pivot_table_request(source, data_source, row_col, value_col, location_spreadsheet,
+                                 pivot_table_location, summarize_function, row_name, row_col_2nd, row_name_2nd,
+                                 value_name, value_col_2nd, value_name_2nd):
     # Google Sheets Pivot Table API: https://developers.google.com/sheets/api/samples/pivot-tables
+    new_pivot_table_request = pivot_table_request
 
-    pivot_table_body = {
-        "requests": [
-            {
-                'updateCells': {
-                    'rows': [
-                        {
-                            'values': [
-                                {
-                                    "pivotTable": {
-                                        "dataSourceId": data_source_id,
-                                        "rows": {
-                                            "dataSourceColumnReference": {
-                                                "name": row_col_name,
-                                            },
-                                            "sortOrder": "DESCENDING",
-                                            "showTotals": False,
-                                            "valueBucket": {}
-                                        },
-                                        "filterSpecs": {
-                                            "filterCriteria": {
-                                                "condition": {
-                                                    "type": "NUMBER_GREATER",
-                                                    "values": [{
-                                                        "userEnteredValue": "0"
-                                                    }]
-                                                }
-                                            },
-                                            "dataSourceColumnReference": {
-                                                "name": value_col_name,
-                                            },
-                                        },
-                                        'values': {
-                                            'summarizeFunction': function,
-                                            'dataSourceColumnReference': {
-                                                'name': value_col_name
-                                            },
-                                            'name': 'Total'
-                                        },
-                                        'valueLayout': 'HORIZONTAL'
-                                    }
-                                }
-                            ]
-                        },
-                    ],
-                    'start': {
-                        'sheetId': location_spreadsheet,
-                        'rowIndex': pivot_table_location[1],
-                        'columnIndex': pivot_table_location[0]
-                    },
-                    'fields': 'pivotTable'
-                }
-            }
-        ]
-    }
+    if source == "BQ":
+        new_pivot_table_request["requests"][0]["updateCells"]["rows"][0]["values"][0]["pivotTable"][
+            "dataSourceId"] = data_source[0]
+        new_pivot_table_request["requests"][0]["updateCells"]["rows"][0]["values"][0]["pivotTable"][
+            "dataSourceId"] = data_source[0]
+        new_pivot_table_request["requests"][0]["updateCells"]["rows"][0]["values"][0]["pivotTable"]["rows"][
+            "dataSourceColumnReference"]["name"] = row_col
+        new_pivot_table_request["requests"][0]["updateCells"]["rows"][0]["values"][0]["pivotTable"]["filterSpecs"][
+            "dataSourceColumnReference"]["name"] = value_col
+        new_pivot_table_request["requests"][0]["updateCells"]["rows"][0]["values"][0]["pivotTable"]["values"][
+            "dataSourceColumnReference"]["name"] = value_col
 
-    return pivot_table_body
+    if source == "SHEETS":
+        # Clean up template table and remove BQ references
+        new_pivot_table_request["requests"][0]["updateCells"]["rows"][0]["values"][0]["pivotTable"].pop("dataSourceId",
+                                                                                                        None)
+        new_pivot_table_request["requests"][0]["updateCells"]["rows"][0]["values"][0]["pivotTable"].pop(
+            "rows", None)
+        new_pivot_table_request["requests"][0]["updateCells"]["rows"][0]["values"][0]["pivotTable"]["filterSpecs"].pop(
+            "dataSourceColumnReference", None)
+        new_pivot_table_request["requests"][0]["updateCells"]["rows"][0]["values"][0]["pivotTable"].pop(
+            "values", None)
+
+        new_pivot_table_request["requests"][0]["updateCells"]["rows"][0]["values"][0]["pivotTable"]["filterSpecs"]["columnOffsetIndex"] = value_col
+
+        new_pivot_table_request["requests"][0]["updateCells"]["rows"][0]["values"][0]["pivotTable"]["source"] = {}
+        new_pivot_table_request["requests"][0]["updateCells"]["rows"][0]["values"][0]["pivotTable"]["source"][
+            "sheetId"] = data_source[0]
+        new_pivot_table_request["requests"][0]["updateCells"]["rows"][0]["values"][0]["pivotTable"]["source"][
+            "startRowIndex"] = 0
+        new_pivot_table_request["requests"][0]["updateCells"]["rows"][0]["values"][0]["pivotTable"]["source"][
+            "startColumnIndex"] = 0
+        new_pivot_table_request["requests"][0]["updateCells"]["rows"][0]["values"][0]["pivotTable"]["source"][
+            "endRowIndex"] = data_source[1]
+        new_pivot_table_request["requests"][0]["updateCells"]["rows"][0]["values"][0]["pivotTable"]["source"][
+            "endColumnIndex"] = data_source[2]
+
+        new_pivot_table_request["requests"][0]["updateCells"]["rows"][0]["values"][0]["pivotTable"]["rows"] = []
+        new_pivot_table_request["requests"][0]["updateCells"]["rows"][0]["values"][0]["pivotTable"]["rows"].append({})
+
+        if row_name is not None:
+            new_pivot_table_request["requests"][0]["updateCells"]["rows"][0]["values"][0]["pivotTable"]["rows"][0][
+                "name"] = row_name
+        new_pivot_table_request["requests"][0]["updateCells"]["rows"][0]["values"][0]["pivotTable"]["rows"][0][
+            "sourceColumnOffset"] = row_col
+        new_pivot_table_request["requests"][0]["updateCells"]["rows"][0]["values"][0]["pivotTable"]["rows"][0][
+            "showTotals"] = False
+        new_pivot_table_request["requests"][0]["updateCells"]["rows"][0]["values"][0]["pivotTable"]["rows"][0][
+            "sortOrder"] = "DESCENDING"
+        new_pivot_table_request["requests"][0]["updateCells"]["rows"][0]["values"][0]["pivotTable"]["rows"][0][
+            "valueBucket"] = {}
+
+        if row_col_2nd is not None:
+            new_pivot_table_request["requests"][0]["updateCells"]["rows"][0]["values"][0]["pivotTable"]["rows"].append(
+                {})
+
+            if row_name_2nd is not None:
+                new_pivot_table_request["requests"][0]["updateCells"]["rows"][0]["values"][0]["pivotTable"]["rows"][1][
+                    "name"] = row_name_2nd
+
+            new_pivot_table_request["requests"][0]["updateCells"]["rows"][0]["values"][0]["pivotTable"]["rows"][1][
+                "sourceColumnOffset"] = row_col_2nd
+            new_pivot_table_request["requests"][0]["updateCells"]["rows"][0]["values"][0]["pivotTable"]["rows"][1][
+                "showTotals"] = False
+            new_pivot_table_request["requests"][0]["updateCells"]["rows"][0]["values"][0]["pivotTable"]["rows"][1][
+                "sortOrder"] = "DESCENDING"
+            new_pivot_table_request["requests"][0]["updateCells"]["rows"][0]["values"][0]["pivotTable"]["rows"][1][
+                "valueBucket"] = {}
+
+        new_pivot_table_request["requests"][0]["updateCells"]["rows"][0]["values"][0]["pivotTable"]["values"] = []
+        new_pivot_table_request["requests"][0]["updateCells"]["rows"][0]["values"][0]["pivotTable"]["values"].append({})
+
+        if value_name is not None:
+            new_pivot_table_request["requests"][0]["updateCells"]["rows"][0]["values"][0]["pivotTable"]["values"][0][
+                "name"] = value_name
+
+        new_pivot_table_request["requests"][0]["updateCells"]["rows"][0]["values"][0]["pivotTable"]["values"][0][
+            "sourceColumnOffset"] = value_col
+        new_pivot_table_request["requests"][0]["updateCells"]["rows"][0]["values"][0]["pivotTable"]["values"][0][
+            "summarizeFunction"] = summarize_function
+
+        if value_col_2nd is not None:
+            new_pivot_table_request["requests"][0]["updateCells"]["rows"][0]["values"][0]["pivotTable"][
+                "values"].append({})
+
+            if value_name_2nd is not None:
+                new_pivot_table_request["requests"][0]["updateCells"]["rows"][0]["values"][0]["pivotTable"]["values"][1][
+                    "name"] = value_name_2nd
+
+            new_pivot_table_request["requests"][0]["updateCells"]["rows"][0]["values"][0]["pivotTable"]["values"][1][
+                "sourceColumnOffset"] = value_col_2nd
+            new_pivot_table_request["requests"][0]["updateCells"]["rows"][0]["values"][0]["pivotTable"]["values"][1][
+                "summarizeFunction"] = summarize_function
+
+    new_pivot_table_request["requests"][0]["updateCells"]["start"]["sheetId"] = location_spreadsheet
+    new_pivot_table_request["requests"][0]["updateCells"]["start"]["rowIndex"] = pivot_table_location[1]
+    new_pivot_table_request["requests"][0]["updateCells"]["start"]["columnIndex"] = pivot_table_location[0]
+
+    return new_pivot_table_request
 
 
 def generate_bq_pie_table_request(spreadsheet, chart_title, data_source_id, ref_col, series_col, position_data):
@@ -615,6 +379,7 @@ def generate_bq_pie_table_request(spreadsheet, chart_title, data_source_id, ref_
             }
         ]
     }
+
     return pie_chart_body
 
 
@@ -655,39 +420,37 @@ def generate_bq_mc_sheets(spreadsheet, worksheet_names, data_source_ids, pivot_t
         3,  # Column D
         0  # Row 1
     ]
-    response = spreadsheet.batch_update(
-        generate_bq_pivot_table_request(data_source_ids[0], overview_row_col_name,
-                                        overview_value_col_name,
-                                        overview_worksheet_id,
-                                        pivot_table_location,
-                                        "SUM"
-                                        ))
 
+    source = "BQ"
+    data_source = [data_source_ids[0]]
+
+    response = spreadsheet.batch_update(
+        generate_pivot_table_request(source, data_source, overview_row_col_name, overview_value_col_name,
+                                     overview_worksheet_id,
+                                     pivot_table_location, "SUM", None, None, None, None, None, None
+                                     ))
     # Add Instance Count to Overview Worksheet
     pivot_table_location = [
         6,  # Column G
         0  # Row 1
     ]
-    response = spreadsheet.batch_update(
-        generate_bq_pivot_table_request(data_source_ids[0], "Destination_Shape",
-                                        "GCP_Cost",
-                                        overview_worksheet_id,
-                                        pivot_table_location,
-                                        "SUM"
-                                        ))
 
+    response = spreadsheet.batch_update(
+        generate_pivot_table_request(source, data_source, "Destination_Shape", "GCP_Cost", overview_worksheet_id,
+                                     pivot_table_location, "SUM", None, None, None, None, None, None
+                                     ))
     # Add Cost sums to AWS Unmapped Worksheet
+    data_source = [data_source_ids[1]]
     pivot_table_location = [
         0,  # Column D
         0  # Row 1
     ]
+
     response = spreadsheet.batch_update(
-        generate_bq_pivot_table_request(data_source_ids[1], unmapped_row_col_name,
-                                        unmapped_value_col_name,
-                                        unmapped_worksheet_id,
-                                        pivot_table_location,
-                                        "SUM"
-                                        ))
+        generate_pivot_table_request(source, data_source, unmapped_row_col_name, unmapped_value_col_name,
+                                     unmapped_worksheet_id,
+                                     pivot_table_location, "SUM", None, None, None, None, None, None
+                                     ))
 
     # Add Piechart for GCP Services
     chart_title = "GCP Services Breakdown"
@@ -770,14 +533,14 @@ def generate_bq_cur_sheets(spreadsheet, worksheet_names, data_source_ids, pivot_
     worksheet_names.append(overview_worksheet)
     # worksheet_names.extend(bq_tables)
 
-    # Add Cost sums to Overview Worksheet
-    response = spreadsheet.batch_update(
-        generate_bq_pivot_table_request(data_source_ids[0], overview_row_col_name, overview_value_col_name,
-                                        overview_worksheet_id,
-                                        pivot_table_location,
-                                        "SUM"
-                                        ))
+    source = "BQ"
+    data_source = [data_source_ids[0]]
 
+    response = spreadsheet.batch_update(
+        generate_pivot_table_request(source, data_source, overview_row_col_name, overview_value_col_name,
+                                     overview_worksheet_id,
+                                     pivot_table_location, "SUM", None, None, None, None, None, None
+                                     ))
     # Autosize first cols in Overview worksheet
     first_col = 0
     last_col = 10
@@ -791,7 +554,7 @@ def import_mc_data(mc_reports_directory, spreadsheet, credentials):
     # Grabbing a list of files from the provided mc directory
     try:
         mc_file_list = os.listdir(mc_reports_directory)
-        print("Importing pricing report files...")
+        print("Importing pricing report data...")
     except:
         print("Unable to access directory: " + mc_reports_directory)
         exit()
@@ -863,19 +626,38 @@ def import_mc_data(mc_reports_directory, spreadsheet, credentials):
     values_column_offset = 23  # Data, Column X, GCP Cost
     values_column_offset_2nd = 19  # Data, Column T, AWS Cost
     location_data = [0, 0]  # Cell: Column A, Row 1
-    res = spreadsheet.batch_update(
-        generate_pivot_table_request_sum(mapped_worksheet_id.id, overview_worksheet_id, mapped_csv_header_length,
-                                         mapped_csv_num_rows, location_data,
-                                         rows_column_offset, None, values_column_offset, values_column_offset_2nd))
+
+    # res = spreadsheet.batch_update(
+    #     generate_pivot_table_request_sum(mapped_worksheet_id.id, overview_worksheet_id, mapped_csv_header_length,
+    #                                      mapped_csv_num_rows, location_data,
+    #                                      rows_column_offset, None, values_column_offset, values_column_offset_2nd))
+
+    source = "SHEETS"
+    data_source = [mapped_worksheet_id.id, mapped_csv_header_length, mapped_csv_num_rows]
+
+    response = spreadsheet.batch_update(
+        generate_pivot_table_request(source, data_source, rows_column_offset, values_column_offset,
+                                     overview_worksheet_id,
+                                     location_data, "SUM", None, None, None, "GCP Cost", values_column_offset_2nd, "AWS Cost"
+                                     ))
 
     # Create pivot table of GCP Machine types & totals for each
     rows_column_offset = 10  # Data, Column K
     values_column_offset = 10  # Data, Column K
     location_data = [4, 0]  # Cell: Column E, Row 1
-    res = spreadsheet.batch_update(
-        generate_pivot_table_request_count(mapped_worksheet_id.id, overview_worksheet_id, mapped_csv_header_length,
-                                           mapped_csv_num_rows, location_data,
-                                           7, rows_column_offset, values_column_offset, False))
+    # res = spreadsheet.batch_update(
+    #     generate_pivot_table_request_count(mapped_worksheet_id.id, overview_worksheet_id, mapped_csv_header_length,
+    #                                        mapped_csv_num_rows, location_data,
+    #                                        7, rows_column_offset, values_column_offset, False))
+
+    data_source = [mapped_worksheet_id.id, mapped_csv_header_length, mapped_csv_num_rows]
+
+    response = spreadsheet.batch_update(
+        generate_pivot_table_request(source, data_source, rows_column_offset, values_column_offset,
+                                     overview_worksheet_id,
+                                     location_data, "SUM", None, None, None, None, None,
+                                     None
+                                     ))
     # Add Piechart of GCP Machine types in GCP Overview
     chart_title = "GCP Instance Breakdown"
     first_column = 5  # Col F
@@ -908,11 +690,20 @@ def import_mc_data(mc_reports_directory, spreadsheet, credentials):
     values_column_offset = 9  # Data, Column V
     values_column_offset_2nd = 0  # Ignore
     location_data = [0, 0]  # Cell: Column A, Row 1
-    res = spreadsheet.batch_update(
-        generate_pivot_table_request_sum(unmapped_worksheet_id.id, unmapped_overview_worksheet_id,
-                                         unmapped_csv_header_length,
-                                         unmapped_csv_num_rows, location_data,
-                                         rows_column_offset, None, values_column_offset, values_column_offset_2nd))
+    # res = spreadsheet.batch_update(
+    #     generate_pivot_table_request_sum(unmapped_worksheet_id.id, unmapped_overview_worksheet_id,
+    #                                      unmapped_csv_header_length,
+    #                                      unmapped_csv_num_rows, location_data,
+    #                                      rows_column_offset, None, values_column_offset, values_column_offset_2nd))
+
+    data_source = [unmapped_worksheet_id.id, unmapped_csv_header_length, unmapped_csv_num_rows]
+
+    response = spreadsheet.batch_update(
+        generate_pivot_table_request(source, data_source, rows_column_offset, values_column_offset,
+                                     unmapped_overview_worksheet_id,
+                                     location_data, "SUM", None, None, None, None, values_column_offset_2nd,
+                                     None
+                                     ))
 
     # Add Piechart of Unmapped Services Unmapped Overview
     chart_title = "Unmapped Services Breakdown"
@@ -981,7 +772,7 @@ def import_mc_into_bq(mc_reports_directory, gcp_project_id, bq_dataset_name, bq_
     # Grabbing a list of files from the provided mc directory
     try:
         print("Importing pricing report files...")
-        for file in mappings_file["mc_names"].keys():
+        for file in settings_file["mc_names"].keys():
             if os.path.isfile(f"{mc_reports_directory}{file}.csv"):
                 mc_file_list.append(f"{file}")
         # mc_file_list = os.listdir(f"{mc_reports_directory}/*.csv")
@@ -990,7 +781,7 @@ def import_mc_into_bq(mc_reports_directory, gcp_project_id, bq_dataset_name, bq_
         exit()
 
     # Verify MC files exist
-    if len(mc_file_list) < len(mappings_file["mc_names"].keys()):
+    if len(mc_file_list) < len(settings_file["mc_names"].keys()):
         print("Required MC data files do not exist! Exiting!")
         exit()
 
@@ -1311,7 +1102,8 @@ def main():
         print("Migration Center Reports directory not defined, exiting!")
         exit()
 
-    if connect_sheets_bq is True and (enable_bq_import is False and enable_cur_import is False and do_not_import_data is False):
+    if connect_sheets_bq is True and (
+            enable_bq_import is False and enable_cur_import is False and do_not_import_data is False):
         print("Must enable Big Query with -b or -a before creating a Connected BQ Google Sheets!")
         exit()
 
@@ -1398,7 +1190,8 @@ def main():
                                    customer_name, display_looker, looker_template_id)
 
         if do_not_import_data is True:
-            looker_report_url = create_looker_url("MC", customer_name, datetime, gcp_project_id, bq_dataset_name, bq_table_prefix)
+            looker_report_url = create_looker_url("MC", customer_name, datetime, gcp_project_id, bq_dataset_name,
+                                                  bq_table_prefix)
 
             print(f"Looker URL: {looker_report_url}")
 
@@ -1456,7 +1249,6 @@ def main():
                 overview_worksheet = spreadsheet.worksheet("AWS Overview")
 
                 spreadsheet.reorder_worksheets([overview_worksheet])
-
 
             # Delete default worksheet
             worksheet = spreadsheet.worksheet("Sheet1")
