@@ -125,57 +125,52 @@
     },
     "pie_chart_request": {
         "requests": [
-            {
-                "addChart": {
-                    "chart": {
-                        "spec": {
-                            "title": "REPLACE_TITLE",
-                            "pieChart": {
-                                "legendPosition": "LABELED_LEGEND",
-                                "domain": {
-                                    "columnReference": {
-                                        "name": "REPLACE_REF_COLUMN"
-                                    }
-                                },
-                                "series": {
-                                    "columnReference": {
-                                        "name": "REPLACE_VALUE_COLUMN"
-                                    },
-                                    "aggregateType": "SUM"
-                                },
-                                "threeDimensional": true
-                            },
-                            "filterSpecs": {
-                                "filterCriteria": {
-                                    "condition": {
-                                        "type": "NUMBER_GREATER",
-                                        "values": [
-                                            {
-                                                "userEnteredValue": "0"
-                                            }
-                                        ]
-                                    }
-                                },
-                                "dataSourceColumnReference": {
-                                    "name": "REPLACE_VALUE_COLUMN"
+        {
+            "addChart": {
+                "chart": {
+                    "spec": {
+                        "title": "CHART_TITLE",
+                        "pieChart": {
+                            "legendPosition": "LABELED_LEGEND",
+                            "domain": {
+                                "sourceRange": {
+                                    "sources": [
+                                        {
+                                            "sheetId": "SHEET_ID",
+                                            "startRowIndex": 0,
+                                            "startColumnIndex": "START_COL",
+                                            "endColumnIndex": "START_COL +1"
+                                        }
+                                    ]
                                 }
                             },
-                            "dataSourceChartProperties": {
-                                "dataSourceId": "REPLACE_DATASOURCE_ID"
-                            }
-                        },
-                        "position": {
-                            "overlayPosition": {
-                                "anchorCell": {
-                                    "sheetId": "REPLACE_SHEET_ID",
-                                    "columnIndex": 9,
-                                    "rowIndex": 0
+                            "series": {
+                                "sourceRange": {
+                                    "sources": [
+                                        {
+                                            "sheetId": "SHEET_ID",
+                                            "startRowIndex": 0,
+                                            "startColumnIndex": "SECOND_COL",
+                                            "endColumnIndex": "SECOND_COL +1"
+                                        }
+                                    ]
                                 }
+                            },
+                            "threeDimensional": true
+                        }
+                    },
+                    "position": {
+                        "overlayPosition": {
+                            "anchorCell": {
+                                "sheetId": "SHEET_ID",
+                                "columnIndex": "LOCATION_COL",
+                                "rowIndex": "LOCATION_ROW"
                             }
                         }
                     }
                 }
             }
-        ]
+        }
+    ]
     }
 }
