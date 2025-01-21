@@ -113,9 +113,9 @@ Migration Center Pricing Report for Demo Customer, Inc: https://docs.google.com/
 
 ```shell 
 $ cd google-mc-c2c-data-import/python
-$ python google-mc-c2c-data-import.py -d ~/mc-test/ -c "TMEG Customer, Inc" -b -n -l -i project_id.bq_dataset.bg_table_prefix_
+$ python google-mc-c2c-data-import.py -d ~/mc-test/ -c "Demo Customer, Inc" -b -n -l -i project_id.bq_dataset.bg_table_prefix_
 Migration Center C2C Data Import, v0.2
-Customer: TMEG Customer, Inc
+Customer: Demo Customer, Inc
 Migration Center Reports directory: /home/user/mc-test/
 BQ Table Prefix: bq_table_
 Importing data into Big Query...
@@ -130,7 +130,7 @@ Importing unmapped.csv into BQ Table: project_id.bq_dataset.bg_table_prefix_unma
 Loaded 63849667 rows and 17 columns to project_id.bq_dataset.bg_table_prefix_unmapped
 Skipping discount.csv since there is no Migration Center data in the file.
 Completed loading of Migration Center Data into Big Query.
-Looker URL: https://lookerstudio.google.com/reporting/create?c.reportId=421c8150-e7ad-4190-b044-6a18ecdbd391&r.reportName=AWS+-%3E+GCP+Pricing+Analysis%3A+TMEG+Customer%2C+Inc%2C+2025-01-21+18%3A19&ds.ds0.connector=bigQuery&ds.ds0.datasourceName=mapped&ds.ds0.projectId=project_id&ds.ds0.type=TABLE&ds.ds0.datasetId=bq_dataset&ds.ds0.tableId=bq_table_mapped&ds.ds1.connector=bigQuery&ds.ds1.datasourceName=unmapped&ds.ds1.projectId=project_id&ds.ds1.type=TABLE&ds.ds1.datasetId=bq_dataset&ds.ds1.tableId=bq_table_unmapped
+Looker URL: https://lookerstudio.google.com/reporting/create?c.reportId=421c8150-e7ad-4190-b044-6a18ecdbd391&r.reportName=AWS+-%3E+GCP+Pricing+Analysis%3A+Demo+Customer%2C+Inc%2C+2025-01-21+18%3A19&ds.ds0.connector=bigQuery&ds.ds0.datasourceName=mapped&ds.ds0.projectId=project_id&ds.ds0.type=TABLE&ds.ds0.datasetId=bq_dataset&ds.ds0.tableId=bq_table_mapped&ds.ds1.connector=bigQuery&ds.ds1.datasourceName=unmapped&ds.ds1.projectId=project_id&ds.ds1.type=TABLE&ds.ds1.datasetId=bq_dataset&ds.ds1.tableId=bq_table_unmapped
 
 Creating new Google Sheets...
 Migration Center Sheets: https://docs.google.com/spreadsheets/d/123456789
