@@ -85,7 +85,8 @@ def check_csv_size(mc_reports_directory):
 # Create Initial Google Sheets
 def create_google_sheets(customer_name, sheets_email_addresses, service_account_key, sheets_id):
     if sheets_id == "":
-        print("\nCreating new Google Sheets...")
+        # print("\nCreating new Google Sheets...")
+        test = 0
     else:
         print("\nUpdating Google Sheets: " + sheets_id)
 
