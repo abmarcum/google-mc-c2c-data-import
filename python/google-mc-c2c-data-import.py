@@ -47,8 +47,9 @@ f = open('settings.json', )
 settings_file = json.load(f)
 mc_names = settings_file["mc_names"]
 mc_column_names = settings_file["mc_column_names"]
-pivot_table_request = settings_file["pivot_table_request"]
-pie_chart_request = settings_file["pie_chart_request"]
+# pivot_table_request = settings_file["pivot_table_request"]
+# pie_chart_request = settings_file["pie_chart_request"]
+refresh_data_sources_body = settings_file["refresh_data_sources"]
 f.close()
 
 default_mc_looker_template_id = "421c8150-e7ad-4190-b044-6a18ecdbd391"
@@ -117,7 +118,11 @@ def create_google_sheets(customer_name, sheets_email_addresses, service_account_
 def generate_pie_table_request(spreadsheet, chart_title, ref_column, value_column, position_data):
     # Google Sheets Charts API: https://developers.google.com/sheets/api/samples/charts
 
-    new_pie_chart_request = pie_chart_request
+    f = open('settings.json', )
+    template_file = json.load(f)
+    new_pie_chart_request = template_file["pie_chart_request"]
+    f.close()
+
     new_pie_chart_request["requests"][0]["addChart"]["chart"]["spec"]["title"] = chart_title
     # new_pie_chart_request["requests"][0]["addChart"]["chart"]["spec"]["pieChart"]["domain"]["sourceRange"]["sources"] = []
     # new_pie_chart_request["requests"][0]["addChart"]["chart"]["spec"]["pieChart"]["domain"]["sourceRange"]["sources"].append({})
@@ -200,15 +205,50 @@ def generate_pivot_table_request(source, data_source, row_col, value_col, locati
                                  pivot_table_location, summarize_function, row_name, row_col_2nd, row_name_2nd,
                                  value_name, value_col_2nd, value_name_2nd, filter_col):
     # Google Sheets Pivot Table API: https://developers.google.com/sheets/api/samples/pivot-tables
-    new_pivot_table_request = pivot_table_request
+    f = open('settings.json', )
+    template_file = json.load(f)
+    new_pivot_table_request = template_file["pivot_table_request"]
+    f.close()
 
     if source == "BQ":
         new_pivot_table_request["requests"][0]["updateCells"]["rows"][0]["values"][0]["pivotTable"][
             "dataSourceId"] = data_source[0]
         new_pivot_table_request["requests"][0]["updateCells"]["rows"][0]["values"][0]["pivotTable"][
             "dataSourceId"] = data_source[0]
-        new_pivot_table_request["requests"][0]["updateCells"]["rows"][0]["values"][0]["pivotTable"]["rows"][
-            "dataSourceColumnReference"]["name"] = row_col
+
+        # If defined, add a 2nd column source for the Pivot Table
+        if row_col_2nd is not None:
+            # new_pivot_table_request["requests"][0]["updateCells"]["rows"][0]["values"][0]["pivotTable"]["rows"]["dataSourceColumnReference"]["name"] = row_col
+
+            new_pivot_table_request["requests"][0]["updateCells"]["rows"][0]["values"][0]["pivotTable"]["rows"] = []
+            new_pivot_table_request["requests"][0]["updateCells"]["rows"][0]["values"][0]["pivotTable"]["rows"].append(
+                {})
+            new_pivot_table_request["requests"][0]["updateCells"]["rows"][0]["values"][0]["pivotTable"]["rows"].append(
+                {})
+            new_pivot_table_request["requests"][0]["updateCells"]["rows"][0]["values"][0]["pivotTable"]["rows"][0][
+                "showTotals"] = False
+            new_pivot_table_request["requests"][0]["updateCells"]["rows"][0]["values"][0]["pivotTable"]["rows"][0][
+                "sortOrder"] = "DESCENDING"
+            new_pivot_table_request["requests"][0]["updateCells"]["rows"][0]["values"][0]["pivotTable"]["rows"][0][
+                "valueBucket"] = {}
+            new_pivot_table_request["requests"][0]["updateCells"]["rows"][0]["values"][0]["pivotTable"]["rows"][0][
+                "dataSourceColumnReference"] = {}
+            new_pivot_table_request["requests"][0]["updateCells"]["rows"][0]["values"][0]["pivotTable"]["rows"][0][
+                "dataSourceColumnReference"]["name"] = row_col
+
+
+            new_pivot_table_request["requests"][0]["updateCells"]["rows"][0]["values"][0]["pivotTable"]["rows"][1][
+                "showTotals"] = False
+            new_pivot_table_request["requests"][0]["updateCells"]["rows"][0]["values"][0]["pivotTable"]["rows"][1][
+                "sortOrder"] = "DESCENDING"
+            new_pivot_table_request["requests"][0]["updateCells"]["rows"][0]["values"][0]["pivotTable"]["rows"][1][
+                "valueBucket"] = {}
+            new_pivot_table_request["requests"][0]["updateCells"]["rows"][0]["values"][0]["pivotTable"]["rows"][1][
+                "dataSourceColumnReference"] = {}
+            new_pivot_table_request["requests"][0]["updateCells"]["rows"][0]["values"][0]["pivotTable"]["rows"][1]["dataSourceColumnReference"]["name"] = row_col_2nd
+        else:
+            new_pivot_table_request["requests"][0]["updateCells"]["rows"][0]["values"][0]["pivotTable"]["rows"]["dataSourceColumnReference"]["name"] = row_col
+
         new_pivot_table_request["requests"][0]["updateCells"]["rows"][0]["values"][0]["pivotTable"]["values"][
             "dataSourceColumnReference"]["name"] = value_col
 
@@ -218,16 +258,20 @@ def generate_pivot_table_request(source, data_source, row_col, value_col, locati
         else:
             new_pivot_table_request["requests"][0]["updateCells"]["rows"][0]["values"][0]["pivotTable"]["filterSpecs"][
                 "dataSourceColumnReference"]["name"] = filter_col
+            new_pivot_table_request["requests"][0]["updateCells"]["rows"][0]["values"][0]["pivotTable"]["filterSpecs"]["filterCriteria"]["condition"]["type"] = "NOT_BLANK"
+            new_pivot_table_request["requests"][0]["updateCells"]["rows"][0]["values"][0]["pivotTable"]["filterSpecs"]["filterCriteria"]["condition"]["values"] = []
 
     if source == "SHEETS":
         # Clean up template table and remove BQ references
-        new_pivot_table_request["requests"][0]["updateCells"]["rows"][0]["values"][0]["pivotTable"].pop("dataSourceId", None)
+        new_pivot_table_request["requests"][0]["updateCells"]["rows"][0]["values"][0]["pivotTable"].pop("dataSourceId",
+                                                                                                        None)
         new_pivot_table_request["requests"][0]["updateCells"]["rows"][0]["values"][0]["pivotTable"].pop("rows", None)
 
         new_pivot_table_request["requests"][0]["updateCells"]["rows"][0]["values"][0]["pivotTable"].pop("values", None)
 
         # Create Filter for Pivot Table - default is to not show anything less than zero
-        new_pivot_table_request["requests"][0]["updateCells"]["rows"][0]["values"][0]["pivotTable"].pop('filterSpecs', None)
+        new_pivot_table_request["requests"][0]["updateCells"]["rows"][0]["values"][0]["pivotTable"].pop('filterSpecs',
+                                                                                                        None)
         new_pivot_table_request["requests"][0]["updateCells"]["rows"][0]["values"][0]["pivotTable"]["filterSpecs"] = []
         new_pivot_table_request["requests"][0]["updateCells"]["rows"][0]["values"][0]["pivotTable"][
             "filterSpecs"].append({})
@@ -327,7 +371,7 @@ def generate_pivot_table_request(source, data_source, row_col, value_col, locati
     return new_pivot_table_request
 
 
-def generate_bq_mc_sheets(spreadsheet, worksheet_names, data_source_ids, pivot_table_location):
+def generate_bq_mc_sheets(spreadsheet, worksheet_names, data_source_ids):
     overview_worksheets_name = "GCP Overview"
     unmapped_worksheets_name = "AWS Unmapped Overview"
     overview_row_col_name = "GCP_Service"
@@ -377,11 +421,27 @@ def generate_bq_mc_sheets(spreadsheet, worksheet_names, data_source_ids, pivot_t
                                      overview_worksheet_id,
                                      pivot_table_location, "SUM", None, None, None, "GCP Cost", "Source_Cost",
                                      "AWS Cost", None
+                                     ),
+
+    )
+
+    pivot_table_location = [
+        6,  # Column G
+        0  # Row 1
+    ]
+
+    overview_row_col_name = "Region"
+    overview_value_col_name = "GCP_Cost"
+    # AWS Region Cost
+    response = spreadsheet.batch_update(
+        generate_pivot_table_request(source, data_source, overview_row_col_name, overview_value_col_name,
+                                     overview_worksheet_id,
+                                     pivot_table_location, "SUM", None, None, None, None, None, None, "Region"
                                      ))
 
-    # Add Instance Count to Overview Worksheet. Filter on Destination_Shape column being not None.
+    # Add Instance Cost to Overview Worksheet. Filter on Destination_Shape column being not None.
     pivot_table_location = [
-        7,  # Column H
+        9,  # Column J
         0  # Row 1
     ]
 
@@ -404,31 +464,55 @@ def generate_bq_mc_sheets(spreadsheet, worksheet_names, data_source_ids, pivot_t
                                      pivot_table_location, "SUM", None, None, None, None, None, None, None
                                      ))
 
+    # Add Instance Region Usage Breakdown.
+    unmapped_row_col_name = "lineItem_ProductCode"
+    unmapped_value_col_name = "lineItem_UnblendedCost"
+    pivot_table_location = [
+        3,  # Column D
+        0  # Row 1
+    ]
+
+    response = spreadsheet.batch_update(
+        generate_pivot_table_request(source, data_source, unmapped_row_col_name, unmapped_value_col_name,
+                                     unmapped_worksheet_id,
+                                     pivot_table_location, "SUM", None, "lineItem_UsageType", None, None, None, None, None
+                                     ))
+
     # Add Piechart for GCP Services
     chart_title = "GCP Services Breakdown"
 
     position_data = [
-        10,  # Column K
+        12,  # Column K
         0  # Row 1
     ]
 
     res = spreadsheet.batch_update(generate_pie_table_request(overview_worksheet_id, chart_title, 3, 4, position_data))
 
+    # Add Piechart for GCP Services
+    chart_title = "GCP Regions Breakdown"
+
+    position_data = [
+        12,  # Column K
+        21  # Row 1
+    ]
+
+    res = spreadsheet.batch_update(generate_pie_table_request(overview_worksheet_id, chart_title, 6, 7, position_data))
+
     # Add Piechart for Instances
     chart_title = "GCP Instance Breakdown"
 
     position_data = [
-        10,  # Column K
-        21  # Row 20
+        12,  # Column K
+        42  # Row 20
     ]
 
-    res = spreadsheet.batch_update(generate_pie_table_request(overview_worksheet_id, chart_title, 7, 8, position_data))
+    res = spreadsheet.batch_update(generate_pie_table_request(overview_worksheet_id, chart_title, 9, 10, position_data))
 
     # Add Piechart for AWS Unmapped Services
     chart_title = "AWS Unmapped Services Breakdown"
 
     position_data = [
-        3,  # Column D
+        7,  # Column H
         0  # Row 1
     ]
 
@@ -449,17 +533,23 @@ def generate_bq_mc_sheets(spreadsheet, worksheet_names, data_source_ids, pivot_t
         "numberFormat": {"type": "CURRENCY"}
     })
 
-    overview_worksheet.format("F", {
+    # Change Region Cost Totals to Currency format
+    overview_worksheet.format("H", {
         "numberFormat": {"type": "CURRENCY"}
     })
 
-    # Change Overview Cost Totals to Currency format
-    overview_worksheet.format("I", {
+    # Change Instance Cost Totals to Currency format
+    overview_worksheet.format("K", {
         "numberFormat": {"type": "CURRENCY"}
     })
 
     # Change Unmapped Cost Totals to Currency format
     unmapped_worksheet.format("B", {
+        "numberFormat": {"type": "CURRENCY"}
+    })
+
+    # Change Unmapped Services Details Totals to Currency format
+    unmapped_worksheet.format("F", {
         "numberFormat": {"type": "CURRENCY"}
     })
 
@@ -471,32 +561,189 @@ def generate_bq_mc_sheets(spreadsheet, worksheet_names, data_source_ids, pivot_t
     # Autosize first cols in Unmapped worksheet
     res = spreadsheet.batch_update(autosize_worksheet(unmapped_worksheet_id, first_col, last_col))
 
+    # Refresh all BQ Data sources (removes 'Apply' button from pivot tables)
+    res = spreadsheet.batch_update(refresh_data_sources_body)
 
-def generate_bq_cur_sheets(spreadsheet, worksheet_names, data_source_ids, pivot_table_location):
+
+def generate_bq_cur_sheets(spreadsheet, worksheet_names, data_source_ids):
     overview_worksheets_name = "AWS Overview"
+    details_worksheets_name = "AWS Details"
     overview_row_col_name = "lineItem_ProductCode"
     overview_value_col_name = "lineItem_UnblendedCost"
 
     # Create Overview Worksheet in Sheets
     overview_worksheet = spreadsheet.add_worksheet(overview_worksheets_name, 60, 25)
-    overview_worksheet_id = overview_worksheet._properties['sheetId']
+    details_worksheet = spreadsheet.add_worksheet(details_worksheets_name, 60, 25)
 
-    # Add worksheet names to list for future sorting
-    worksheet_names.append(overview_worksheet)
-    # worksheet_names.extend(bq_tables)
+    overview_worksheet_id = overview_worksheet._properties['sheetId']
+    details_worksheet_id = details_worksheet._properties['sheetId']
 
     source = "BQ"
     data_source = [data_source_ids[0]]
 
+    pivot_table_location = [
+        2,  # Column C
+        0  # Row 1
+    ]
+
+    # AWS Services Cost
     response = spreadsheet.batch_update(
         generate_pivot_table_request(source, data_source, overview_row_col_name, overview_value_col_name,
                                      overview_worksheet_id,
                                      pivot_table_location, "SUM", None, None, None, None, None, None, None
                                      ))
+
+    pivot_table_location = [
+        5,  # Column F
+        0  # Row 1
+    ]
+
+    overview_row_col_name = "product_region"
+    overview_value_col_name = "lineItem_UnblendedCost"
+    # AWS Region Cost
+    response = spreadsheet.batch_update(
+        generate_pivot_table_request(source, data_source, overview_row_col_name, overview_value_col_name,
+                                     overview_worksheet_id,
+                                     pivot_table_location, "SUM", None, None, None, None, None, None, None
+                                     ))
+
+    pivot_table_location = [
+        8,  # Column F
+        0  # Row 1
+    ]
+
+    overview_row_col_name = "product_instanceType"
+    overview_value_col_name = "lineItem_UnblendedCost"
+    # AWS Instance Cost
+    response = spreadsheet.batch_update(
+        generate_pivot_table_request(source, data_source, overview_row_col_name, overview_value_col_name,
+                                     overview_worksheet_id,
+                                     pivot_table_location, "SUM", None, None, None, None, None, None,
+                                     "product_instanceType"
+                                     ))
+
+    pivot_table_location = [
+        0,  # Column A
+        0  # Row 1
+    ]
+
+    details_row_col_name = "lineItem_ProductCode"
+    details_value_col_name = "lineItem_UnblendedCost"
+    # AWS Services Details Cost
+    response = spreadsheet.batch_update(
+        generate_pivot_table_request(source, data_source, details_row_col_name, details_value_col_name,
+                                     details_worksheet_id,
+                                     pivot_table_location, "SUM", None, "lineItem_UsageType", None, None, None, None,
+                                     None
+                                     ))
+
+    pivot_table_location = [
+        4,  # Column E
+        0  # Row 1
+    ]
+
+    details_row_col_name = "product_region"
+    details_value_col_name = "lineItem_UnblendedCost"
+    # AWS Services Details Cost
+    response = spreadsheet.batch_update(
+        generate_pivot_table_request(source, data_source, details_row_col_name, details_value_col_name,
+                                     details_worksheet_id,
+                                     pivot_table_location, "SUM", None, "product_instanceType", None, None, None, None,
+                                     None
+                                     ))
+
+    # Add Piechart for AWS Services
+    chart_title = "AWS Services Breakdown"
+
+    position_data = [
+        11,  # Column J
+        0  # Row 1
+    ]
+
+    res = spreadsheet.batch_update(generate_pie_table_request(overview_worksheet_id, chart_title, 2, 3, position_data))
+
+    # Add Piechart for AWS Regions
+    chart_title = "AWS Regions Breakdown"
+
+    position_data = [
+        11,  # Column J
+        21  # Row 21
+    ]
+
+    res = spreadsheet.batch_update(generate_pie_table_request(overview_worksheet_id, chart_title, 5, 6, position_data))
+
+    # Add Piechart for AWS Instances
+    chart_title = "AWS Instance Breakdown"
+
+    position_data = [
+        11,  # Column J
+        42  # Row 42
+    ]
+
+    res = spreadsheet.batch_update(generate_pie_table_request(overview_worksheet_id, chart_title, 8, 9, position_data))
+
+    # Add Piechart for AWS Detailed Instances
+    chart_title = "AWS Region Instance Breakdown"
+
+    position_data = [
+        8,  # Column I
+        0  # Row 1
+    ]
+
+    res = spreadsheet.batch_update(generate_pie_table_request(details_worksheet_id, chart_title, 4, 6, position_data))
+
+    overview_worksheet.batch_update([{
+        'range': "A1",
+        'values': [["AWS Total Cost"]],
+    }, {
+        'range': "A2",
+        'values': [["=SUM(D2:D)"]],
+    }]
+        , value_input_option="USER_ENTERED"
+    )
+
+    # Set AWS Cost Totals to Bold
+    overview_worksheet.format("A1", {
+        "textFormat": {"bold": True}
+    })
+
+    # Set AWS Cost Totals to Currency
+    overview_worksheet.format("A2", {
+        "numberFormat": {"type": "CURRENCY"}
+    })
+
+    # Change Services Cost Totals to Currency format
+    overview_worksheet.format("D", {
+        "numberFormat": {"type": "CURRENCY"}
+    })
+
+    # Change Region Cost Totals to Currency format
+    overview_worksheet.format("G", {
+        "numberFormat": {"type": "CURRENCY"}
+    })
+
+    # Change Instance Cost Totals to Currency format
+    overview_worksheet.format("J", {
+        "numberFormat": {"type": "CURRENCY"}
+    })
+
+    # Set AWS Cost Totals to Currency
+    details_worksheet.format("C", {
+        "numberFormat": {"type": "CURRENCY"}
+    })
+
+    # Set AWS Region Totals to Currency
+    details_worksheet.format("G", {
+        "numberFormat": {"type": "CURRENCY"}
+    })
+
     # Autosize first cols in Overview worksheet
     first_col = 0
     last_col = 10
     res = spreadsheet.batch_update(autosize_worksheet(overview_worksheet_id, first_col, last_col))
+
+    # Refresh all BQ Data sources (removes 'Apply' button from pivot tables)
+    res = spreadsheet.batch_update(refresh_data_sources_body)
 
 
 # Import mc data from provided reports directory
@@ -1165,8 +1412,16 @@ def main():
                                    customer_name, display_looker, looker_template_id)
 
         if do_not_import_data is True:
-            looker_report_url = create_looker_url("MC", customer_name, datetime, gcp_project_id, bq_dataset_name,
-                                                  bq_table_prefix)
+            if enable_bq_import is not True and enable_cur_import is not True:
+                print("Please specific whether to generate a Migration Center report (-b) or AWS CUR report (-a).")
+                exit()
+
+            if enable_bq_import is True:
+                looker_report_url = create_looker_url("MC", customer_name, datetime, gcp_project_id, bq_dataset_name,
+                                                      bq_table_prefix)
+            elif enable_cur_import is True:
+                looker_report_url = create_looker_url("CUR", customer_name, datetime, gcp_project_id, bq_dataset_name,
+                                                      bq_table_prefix)
 
             print(f"Looker URL: {looker_report_url}")
 
@@ -1212,18 +1467,19 @@ def main():
                 data_source_ids.append(response['replies'][0]['addDataSource']['dataSource']['dataSourceId'])
 
             pivot_table_location = [0, 0]
-            if enable_bq_import is True or do_not_import_data is True:
-                generate_bq_mc_sheets(spreadsheet, worksheet_names, data_source_ids, pivot_table_location)
+            if enable_bq_import is True:
+                generate_bq_mc_sheets(spreadsheet, worksheet_names, data_source_ids)
                 overview_worksheet = spreadsheet.worksheet("GCP Overview")
                 unmapped_worksheet = spreadsheet.worksheet("AWS Unmapped Overview")
 
                 spreadsheet.reorder_worksheets([overview_worksheet, unmapped_worksheet])
 
             if enable_cur_import is True:
-                generate_bq_cur_sheets(spreadsheet, worksheet_names, data_source_ids, pivot_table_location)
+                generate_bq_cur_sheets(spreadsheet, worksheet_names, data_source_ids)
                 overview_worksheet = spreadsheet.worksheet("AWS Overview")
+                details_worksheet = spreadsheet.worksheet("AWS Details")
 
-                spreadsheet.reorder_worksheets([overview_worksheet])
+                spreadsheet.reorder_worksheets([overview_worksheet, details_worksheet])
 
             # Delete default worksheet
             worksheet = spreadsheet.worksheet("Sheet1")
