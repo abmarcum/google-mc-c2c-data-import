@@ -125,52 +125,65 @@
     },
     "pie_chart_request": {
         "requests": [
-        {
-            "addChart": {
-                "chart": {
-                    "spec": {
-                        "title": "CHART_TITLE",
-                        "pieChart": {
-                            "legendPosition": "LABELED_LEGEND",
-                            "domain": {
-                                "sourceRange": {
-                                    "sources": [
-                                        {
-                                            "sheetId": "SHEET_ID",
-                                            "startRowIndex": 0,
-                                            "startColumnIndex": "START_COL",
-                                            "endColumnIndex": "START_COL +1"
-                                        }
-                                    ]
+            {
+                "addChart": {
+                    "chart": {
+                        "spec": {
+                            "title": "CHART_TITLE",
+                            "pieChart": {
+                                "legendPosition": "LABELED_LEGEND",
+                                "domain": {
+                                    "sourceRange": {
+                                        "sources": [
+                                            {
+                                                "sheetId": "SHEET_ID",
+                                                "startRowIndex": 0,
+                                                "startColumnIndex": "START_COL",
+                                                "endColumnIndex": "START_COL +1"
+                                            }
+                                        ]
+                                    }
+                                },
+                                "series": {
+                                    "sourceRange": {
+                                        "sources": [
+                                            {
+                                                "sheetId": "SHEET_ID",
+                                                "startRowIndex": 0,
+                                                "startColumnIndex": "SECOND_COL",
+                                                "endColumnIndex": "SECOND_COL +1"
+                                            }
+                                        ]
+                                    }
+                                },
+                                "threeDimensional": true
+                            }
+                        },
+                        "position": {
+                            "overlayPosition": {
+                                "anchorCell": {
+                                    "sheetId": "SHEET_ID",
+                                    "columnIndex": "LOCATION_COL",
+                                    "rowIndex": "LOCATION_ROW"
                                 }
-                            },
-                            "series": {
-                                "sourceRange": {
-                                    "sources": [
-                                        {
-                                            "sheetId": "SHEET_ID",
-                                            "startRowIndex": 0,
-                                            "startColumnIndex": "SECOND_COL",
-                                            "endColumnIndex": "SECOND_COL +1"
-                                        }
-                                    ]
-                                }
-                            },
-                            "threeDimensional": true
-                        }
-                    },
-                    "position": {
-                        "overlayPosition": {
-                            "anchorCell": {
-                                "sheetId": "SHEET_ID",
-                                "columnIndex": "LOCATION_COL",
-                                "rowIndex": "LOCATION_ROW"
                             }
                         }
                     }
                 }
             }
-        }
-    ]
+        ]
+    },
+    "refresh_data_sources": {
+        "requests": [
+            {
+                "refreshDataSource": {
+                    "force": true,
+                    "isAll": true
+                }
+            }
+        ],
+        "includeSpreadsheetInResponse": false,
+        "responseRanges": [],
+        "responseIncludeGridData": false
     }
 }
