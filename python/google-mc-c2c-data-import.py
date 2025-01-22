@@ -47,8 +47,8 @@ f = open('settings.json', )
 settings_file = json.load(f)
 mc_names = settings_file["mc_names"]
 mc_column_names = settings_file["mc_column_names"]
-pivot_table_request = settings_file["pivot_table_request"]
-pie_chart_request = settings_file["pie_chart_request"]
+# pivot_table_request = settings_file["pivot_table_request"]
+# pie_chart_request = settings_file["pie_chart_request"]
 refresh_data_sources_body = settings_file["refresh_data_sources"]
 f.close()
 
@@ -118,7 +118,11 @@ def create_google_sheets(customer_name, sheets_email_addresses, service_account_
 def generate_pie_table_request(spreadsheet, chart_title, ref_column, value_column, position_data):
     # Google Sheets Charts API: https://developers.google.com/sheets/api/samples/charts
 
-    new_pie_chart_request = pie_chart_request
+    f = open('settings.json', )
+    template_file = json.load(f)
+    new_pie_chart_request = template_file["pie_chart_request"]
+    f.close()
+
     new_pie_chart_request["requests"][0]["addChart"]["chart"]["spec"]["title"] = chart_title
     # new_pie_chart_request["requests"][0]["addChart"]["chart"]["spec"]["pieChart"]["domain"]["sourceRange"]["sources"] = []
     # new_pie_chart_request["requests"][0]["addChart"]["chart"]["spec"]["pieChart"]["domain"]["sourceRange"]["sources"].append({})
@@ -201,7 +205,10 @@ def generate_pivot_table_request(source, data_source, row_col, value_col, locati
                                  pivot_table_location, summarize_function, row_name, row_col_2nd, row_name_2nd,
                                  value_name, value_col_2nd, value_name_2nd, filter_col):
     # Google Sheets Pivot Table API: https://developers.google.com/sheets/api/samples/pivot-tables
-    new_pivot_table_request = pivot_table_request
+    f = open('settings.json', )
+    template_file = json.load(f)
+    new_pivot_table_request = template_file["pivot_table_request"]
+    f.close()
 
     if source == "BQ":
         new_pivot_table_request["requests"][0]["updateCells"]["rows"][0]["values"][0]["pivotTable"][
@@ -211,11 +218,36 @@ def generate_pivot_table_request(source, data_source, row_col, value_col, locati
 
         # If defined, add a 2nd column source for the Pivot Table
         if row_col_2nd is not None:
-            new_pivot_table_request["requests"][0]["updateCells"]["rows"][0]["values"][0]["pivotTable"]["rows"][
+            # new_pivot_table_request["requests"][0]["updateCells"]["rows"][0]["values"][0]["pivotTable"]["rows"]["dataSourceColumnReference"]["name"] = row_col
+
+            new_pivot_table_request["requests"][0]["updateCells"]["rows"][0]["values"][0]["pivotTable"]["rows"] = []
+            new_pivot_table_request["requests"][0]["updateCells"]["rows"][0]["values"][0]["pivotTable"]["rows"].append(
+                {})
+            new_pivot_table_request["requests"][0]["updateCells"]["rows"][0]["values"][0]["pivotTable"]["rows"].append(
+                {})
+            new_pivot_table_request["requests"][0]["updateCells"]["rows"][0]["values"][0]["pivotTable"]["rows"][0][
+                "showTotals"] = False
+            new_pivot_table_request["requests"][0]["updateCells"]["rows"][0]["values"][0]["pivotTable"]["rows"][0][
+                "sortOrder"] = "DESCENDING"
+            new_pivot_table_request["requests"][0]["updateCells"]["rows"][0]["values"][0]["pivotTable"]["rows"][0][
+                "valueBucket"] = {}
+            new_pivot_table_request["requests"][0]["updateCells"]["rows"][0]["values"][0]["pivotTable"]["rows"][0][
+                "dataSourceColumnReference"] = {}
+            new_pivot_table_request["requests"][0]["updateCells"]["rows"][0]["values"][0]["pivotTable"]["rows"][0][
                 "dataSourceColumnReference"]["name"] = row_col
+
+
+            new_pivot_table_request["requests"][0]["updateCells"]["rows"][0]["values"][0]["pivotTable"]["rows"][1][
+                "showTotals"] = False
+            new_pivot_table_request["requests"][0]["updateCells"]["rows"][0]["values"][0]["pivotTable"]["rows"][1][
+                "sortOrder"] = "DESCENDING"
+            new_pivot_table_request["requests"][0]["updateCells"]["rows"][0]["values"][0]["pivotTable"]["rows"][1][
+                "valueBucket"] = {}
+            new_pivot_table_request["requests"][0]["updateCells"]["rows"][0]["values"][0]["pivotTable"]["rows"][1][
+                "dataSourceColumnReference"] = {}
+            new_pivot_table_request["requests"][0]["updateCells"]["rows"][0]["values"][0]["pivotTable"]["rows"][1]["dataSourceColumnReference"]["name"] = row_col_2nd
         else:
-            new_pivot_table_request["requests"][0]["updateCells"]["rows"][0]["values"][0]["pivotTable"]["rows"][
-                "dataSourceColumnReference"]["name"] = row_col
+            new_pivot_table_request["requests"][0]["updateCells"]["rows"][0]["values"][0]["pivotTable"]["rows"]["dataSourceColumnReference"]["name"] = row_col
 
         new_pivot_table_request["requests"][0]["updateCells"]["rows"][0]["values"][0]["pivotTable"]["values"][
             "dataSourceColumnReference"]["name"] = value_col
@@ -432,8 +464,8 @@ def generate_bq_mc_sheets(spreadsheet, worksheet_names, data_source_ids):
                                      pivot_table_location, "SUM", None, None, None, None, None, None, None
                                      ))
 
-    # Add Services Usage Breakdown.
-    unmapped_row_col_name = "lineItem_UsageType"
+    # Add Instance Region Usage Breakdown.
+    unmapped_row_col_name = "lineItem_ProductCode"
     unmapped_value_col_name = "lineItem_UnblendedCost"
     pivot_table_location = [
         3,  # Column D
@@ -443,7 +475,7 @@ def generate_bq_mc_sheets(spreadsheet, worksheet_names, data_source_ids):
     response = spreadsheet.batch_update(
         generate_pivot_table_request(source, data_source, unmapped_row_col_name, unmapped_value_col_name,
                                      unmapped_worksheet_id,
-                                     pivot_table_location, "SUM", None, None, None, None, None, None, None
+                                     pivot_table_location, "SUM", None, "lineItem_UsageType", None, None, None, None, None
                                      ))
 
     # Add Piechart for GCP Services
@@ -480,7 +512,7 @@ def generate_bq_mc_sheets(spreadsheet, worksheet_names, data_source_ids):
     chart_title = "AWS Unmapped Services Breakdown"
 
     position_data = [
-        6,  # Column G
+        7,  # Column H
         0  # Row 1
     ]
 
@@ -517,7 +549,7 @@ def generate_bq_mc_sheets(spreadsheet, worksheet_names, data_source_ids):
     })
 
     # Change Unmapped Services Details Totals to Currency format
-    unmapped_worksheet.format("E", {
+    unmapped_worksheet.format("F", {
         "numberFormat": {"type": "CURRENCY"}
     })
 
@@ -601,7 +633,7 @@ def generate_bq_cur_sheets(spreadsheet, worksheet_names, data_source_ids):
     response = spreadsheet.batch_update(
         generate_pivot_table_request(source, data_source, details_row_col_name, details_value_col_name,
                                      details_worksheet_id,
-                                     pivot_table_location, "SUM", None, None, None, None, None, None,
+                                     pivot_table_location, "SUM", None, "lineItem_UsageType", None, None, None, None,
                                      None
                                      ))
 
@@ -610,13 +642,13 @@ def generate_bq_cur_sheets(spreadsheet, worksheet_names, data_source_ids):
         0  # Row 1
     ]
 
-    details_row_col_name = "lineItem_UsageType"
+    details_row_col_name = "product_region"
     details_value_col_name = "lineItem_UnblendedCost"
     # AWS Services Details Cost
     response = spreadsheet.batch_update(
         generate_pivot_table_request(source, data_source, details_row_col_name, details_value_col_name,
                                      details_worksheet_id,
-                                     pivot_table_location, "SUM", None, None, None, None, None, None,
+                                     pivot_table_location, "SUM", None, "product_instanceType", None, None, None, None,
                                      None
                                      ))
 
@@ -649,6 +681,16 @@ def generate_bq_cur_sheets(spreadsheet, worksheet_names, data_source_ids):
     ]
 
     res = spreadsheet.batch_update(generate_pie_table_request(overview_worksheet_id, chart_title, 8, 9, position_data))
+
+    # Add Piechart for AWS Detailed Instances
+    chart_title = "AWS Region Instance Breakdown"
+
+    position_data = [
+        8,  # Column I
+        0  # Row 1
+    ]
+
+    res = spreadsheet.batch_update(generate_pie_table_request(details_worksheet_id, chart_title, 4, 6, position_data))
 
     overview_worksheet.batch_update([{
         'range': "A1",
@@ -686,12 +728,12 @@ def generate_bq_cur_sheets(spreadsheet, worksheet_names, data_source_ids):
     })
 
     # Set AWS Cost Totals to Currency
-    details_worksheet.format("B", {
+    details_worksheet.format("C", {
         "numberFormat": {"type": "CURRENCY"}
     })
 
     # Set AWS Region Totals to Currency
-    details_worksheet.format("F", {
+    details_worksheet.format("G", {
         "numberFormat": {"type": "CURRENCY"}
     })
 
