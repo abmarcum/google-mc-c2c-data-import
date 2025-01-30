@@ -2,7 +2,7 @@
 
 This application can automatically create a [Google Sheets](https://sheets.google.com/) from a Migration Center generated pricing report OR import the Migration Center Report and/or AWS CUR into [Big Query](https://cloud.google.com/bigquery). If imported into BQ, a [Looker Studio](https://lookerstudio.google.com/) report can also be created.
 
-**NOTE** - Google Sheets has a limitation of 5 million cells and this size limit prevents the import of large (multi-gigabyte) Migration Center pricing reports. If you hit the cell limitation, consider using the -b argument to import the MC data into Big Query instead. However, Google Sheets will not be created with the '-b' option and you must *manually* connect to Biq Query through the Google Sheets Data Connector. 
+**NOTE** - Google Sheets has a limitation of 5 million cells and this size limit prevents the import of large (multi-gigabyte) Migration Center pricing reports. If you hit the cell limitation, consider using the -b argument to import the MC data into Big Query instead. 
 
 Further Instuctions on using the Google Sheets Data Connector with Big Query can be found [here](https://support.google.com/docs/answer/9702507).
 

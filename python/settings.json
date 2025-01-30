@@ -77,36 +77,42 @@
                                 {
                                     "pivotTable": {
                                         "dataSourceId": "REPLACE_DATASOURCE",
-                                        "rows": {
-                                            "dataSourceColumnReference": {
-                                                "name": "REPLACE_REF_COLUMN"
-                                            },
-                                            "sortOrder": "DESCENDING",
-                                            "showTotals": false,
-                                            "valueBucket": {}
-                                        },
-                                        "filterSpecs": {
-                                            "filterCriteria": {
-                                                "condition": {
-                                                    "type": "NUMBER_GREATER",
-                                                    "values": [
-                                                        {
-                                                            "userEnteredValue": "0"
-                                                        }
-                                                    ]
-                                                }
-                                            },
-                                            "dataSourceColumnReference": {
-                                                "name": "REPLACE_VALUE_COLUMN"
+                                        "rows": [
+                                            {
+                                                "dataSourceColumnReference": {
+                                                    "name": "REPLACE_REF_COLUMN"
+                                                },
+                                                "sortOrder": "DESCENDING",
+                                                "showTotals": false,
+                                                "valueBucket": {}
                                             }
-                                        },
-                                        "values": {
-                                            "summarizeFunction": "SUM",
-                                            "dataSourceColumnReference": {
-                                                "name": "REPLACE_VALUE_COLUMN"
-                                            },
-                                            "name": "Total Cost"
-                                        },
+                                        ],
+                                        "filterSpecs": [
+                                            {
+                                                "filterCriteria": {
+                                                    "condition": {
+                                                        "type": "NUMBER_GREATER",
+                                                        "values": [
+                                                            {
+                                                                "userEnteredValue": "0"
+                                                            }
+                                                        ]
+                                                    }
+                                                },
+                                                "dataSourceColumnReference": {
+                                                    "name": "REPLACE_VALUE_COLUMN"
+                                                }
+                                            }
+                                        ],
+                                        "values": [
+                                            {
+                                                "summarizeFunction": "SUM",
+                                                "dataSourceColumnReference": {
+                                                    "name": "REPLACE_VALUE_COLUMN"
+                                                },
+                                                "name": "Total Cost"
+                                            }
+                                        ],
                                         "valueLayout": "HORIZONTAL"
                                     }
                                 }
