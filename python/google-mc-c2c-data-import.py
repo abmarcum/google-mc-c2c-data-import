@@ -145,6 +145,36 @@ def generate_pie_table_request(spreadsheet, chart_title, ref_column, value_colum
     return new_pie_chart_request
 
 
+def generate_repeat_cell_formula_request(sheet_id, formula, start_column, start_row):
+    # "startColumnIndex": 2 and "endColumnIndex": 3 of range means the column "C".
+    # "startRowIndex": 1 of range and no endRowIndex means that the formula is put from the row 2 to end of row.
+
+    # Currently only support 1 column
+    end_column = start_column + 1
+
+    body = {
+        "requests": [
+            {
+                "repeatCell": {
+                    "cell": {
+                        "userEnteredValue": {
+                            "formulaValue": formula
+                        }
+                    },
+                    "range": {
+                        "sheetId": sheet_id,
+                        "startColumnIndex": start_column,
+                        "endColumnIndex": end_column,
+                        "startRowIndex": start_row
+                    },
+                    "fields": "userEnteredValue.formulaValue"
+                }
+            }
+        ]
+    }
+    return body
+
+
 def autosize_worksheet(sheet_id, first_col, last_col):
     # Autoresize Worksheet - Body values
     body = {
@@ -164,6 +194,22 @@ def autosize_worksheet(sheet_id, first_col, last_col):
 
     time.sleep(1)
     return body
+
+
+def apply_conditional_color_rule(sheet_id, grid_range, boolean_condition, boolean_value, colors):
+    # Set up conditional rules (Red/Green) to GCP Overview Differences
+    rule = ConditionalFormatRule(
+        ranges=[GridRange.from_a1_range(grid_range, sheet_id)],
+        booleanRule=BooleanRule(
+            condition=BooleanCondition(boolean_condition, [boolean_value]),
+            format=CellFormat(textFormat=textFormat(foregroundColor=Color(colors[0], colors[1], colors[2])))
+
+        )
+    )
+
+    sheet_rules = get_conditional_format_rules(sheet_id)
+    sheet_rules.append(rule)
+    sheet_rules.save()
 
 
 # Create API Request to Connect BQ Table to Google Sheets
@@ -451,7 +497,7 @@ def generate_pivot_table_request(source, data_source, row_col, value_col, locati
     return new_pivot_table_request
 
 
-def generate_bq_mc_sheets(spreadsheet, worksheet_names, data_source_ids):
+def generate_mc_sheets(spreadsheet, worksheet_names, data_source_type, data_source_ids):
     exec_overview_worksheets_name = "Executive Overview"
     gcp_overview_worksheets_name = "GCP Detailed Overview"
     unmapped_worksheets_name = "AWS Unmapped Overview"
@@ -464,7 +510,7 @@ def generate_bq_mc_sheets(spreadsheet, worksheet_names, data_source_ids):
     exec_overview_worksheet_id = exec_overview_worksheet._properties['sheetId']
 
     # Create GCP Overview Worksheet in Sheets
-    gcp_overview_worksheet = spreadsheet.add_worksheet(gcp_overview_worksheets_name, 60, 25)
+    gcp_overview_worksheet = spreadsheet.add_worksheet(gcp_overview_worksheets_name, 125, 25)
     gcp_overview_worksheet_id = gcp_overview_worksheet._properties['sheetId']
 
     # Create AWS Unmapped Worksheet in Sheets
@@ -481,26 +527,63 @@ def generate_bq_mc_sheets(spreadsheet, worksheet_names, data_source_ids):
     }, {
         'range': "B1:B3",
         'values': [["=SUM(E2:E)"], ["=SUM(calcctl_unmapped!lineItem_UnblendedCost)"], ["=B1+B2"]],
-        }]
+    }]
         , value_input_option="USER_ENTERED"
     )
 
     exec_overview_worksheet.batch_update([{
         'range': "A5:A7",
-        'values': [["GCP Spend (AWS Matched)"], ["GCP Difference"], ["GCP Discounted Difference"]],
+        'values': [["GCP Spend (AWS Matched)"], ["GCP Difference"], ["GCP % Difference"]],
     }, {
         'range': "B5:B7",
-        'values': [["=SUM(F2:F)"], ["=B5-B1"], ["BLAH"]],
+        'values': [["=SUM(F2:F)"], ["=B5-B1"], ["=B6/B1"]],
     }]
         , value_input_option="USER_ENTERED"
     )
 
     exec_overview_worksheet.batch_update([{
-        'range': "G1:M1",
+        'range': "G1:I1",
         'values': [
-            ["% of AWS Total Spend", "GCP Cost Difference", "% GCP Difference", "GCP Discount", "GCP Discounted Cost",
-             "GCP Discounted Cost Difference", "% of GCP Discounted Cost Difference"]],
+            ["% of AWS Total Spend", "GCP Cost Difference", "% GCP Difference"]],
     }]
+    )
+
+    # Insert Formulas off of pivot tables for above columns
+
+    # % of AWS Total Spend
+    response = spreadsheet.batch_update(
+        generate_repeat_cell_formula_request(exec_overview_worksheet_id, "=IF(ISBLANK($E2), \"\", $E2/$B$3)", 6, 1)
+    )
+
+    # Exec Overview - GCP Cost Difference
+    response = spreadsheet.batch_update(
+        generate_repeat_cell_formula_request(exec_overview_worksheet_id, "=IF(ISBLANK($E2), \"\", $F2-$E2)", 7, 1)
+    )
+
+    # Exec Overview - % GCP Difference
+    response = spreadsheet.batch_update(
+        generate_repeat_cell_formula_request(exec_overview_worksheet_id,
+                                             "=IF(ISBLANK($E2), \"\", if(F2<=0,\"No Google Cost\",($F2-$E2)/$E2))", 8,
+                                             1)
+    )
+
+    gcp_overview_worksheet.batch_update([{
+        'range': "E1:F1",
+        'values': [
+            ["GCP Cost Difference", "% GCP Difference"]],
+    }]
+    )
+
+    # GCP Details - GCP Cost Difference
+    response = spreadsheet.batch_update(
+        generate_repeat_cell_formula_request(gcp_overview_worksheet_id, "=IF(ISBLANK($C2), \"\", $D2-$C2)", 4, 1)
+    )
+
+    # GCP Details - % GCP Difference
+    response = spreadsheet.batch_update(
+        generate_repeat_cell_formula_request(gcp_overview_worksheet_id,
+                                             "=IF(ISBLANK($C2), \"\", if(D2<=0,\"No Google Cost\",($D2-$C2)/$C2))", 5,
+                                             1)
     )
 
     # Add Cost sums to Overview Worksheet. Filter on GCP Cost column being greater than 0.
@@ -509,17 +592,17 @@ def generate_bq_mc_sheets(spreadsheet, worksheet_names, data_source_ids):
         0  # Row 1
     ]
 
-    source = "BQ"
-    data_source = [data_source_ids[0]]
+    if data_source_type == "BQ":
+        data_source = [data_source_ids[0]]
 
     data_row_col_name = "Source_Product"
-    data_value_col_name = "GCP_Cost"
-    data_value_2nd_col_name = "Source_Cost"
-    value_name = "GCP Cost"
-    value_name_2nd = "AWS Cost"
+    data_value_col_name = "Source_Cost"
+    data_value_2nd_col_name = "GCP_Cost"
+    value_name = "AWS Cost"
+    value_name_2nd = "GCP Cost"
 
     response = spreadsheet.batch_update(
-        generate_pivot_table_request(source, data_source, data_row_col_name, data_value_col_name,
+        generate_pivot_table_request(data_source_type, data_source, data_row_col_name, data_value_col_name,
                                      gcp_overview_worksheet_id,
                                      pivot_table_location, "SUM", None, "GCP_Service", None, value_name,
                                      data_value_2nd_col_name,
@@ -535,9 +618,10 @@ def generate_bq_mc_sheets(spreadsheet, worksheet_names, data_source_ids):
 
     data_row_col_name = "Region"
     data_value_col_name = "GCP_Cost"
+
     # AWS Region Cost
     response = spreadsheet.batch_update(
-        generate_pivot_table_request(source, data_source, data_row_col_name, data_value_col_name,
+        generate_pivot_table_request(data_source_type, data_source, data_row_col_name, data_value_col_name,
                                      gcp_overview_worksheet_id,
                                      pivot_table_location, "SUM", None, "GCP_Service", None, None, None, None, "Region",
                                      False
@@ -554,21 +638,23 @@ def generate_bq_mc_sheets(spreadsheet, worksheet_names, data_source_ids):
     filter_col = "Destination_Shape"
 
     response = spreadsheet.batch_update(
-        generate_pivot_table_request(source, data_source, data_row_col_name, data_value_col_name,
+        generate_pivot_table_request(data_source_type, data_source, data_row_col_name, data_value_col_name,
                                      gcp_overview_worksheet_id,
                                      pivot_table_location, "SUM", None, "Destination_Shape", None, None, None, None,
                                      filter_col, False
                                      ))
 
     # Add Cost sums to AWS Unmapped Worksheet. Filter on AWS Cost column being greater than 0.
-    data_source = [data_source_ids[1]]
+    if data_source_type == "BQ":
+        data_source = [data_source_ids[1]]
+
     pivot_table_location = [
         0,  # Column D
         0  # Row 1
     ]
 
     response = spreadsheet.batch_update(
-        generate_pivot_table_request(source, data_source, unmapped_row_col_name, unmapped_value_col_name,
+        generate_pivot_table_request(data_source_type, data_source, unmapped_row_col_name, unmapped_value_col_name,
                                      unmapped_worksheet_id,
                                      pivot_table_location, "SUM", None, None, None, None, None, None, None, False
                                      ))
@@ -582,7 +668,7 @@ def generate_bq_mc_sheets(spreadsheet, worksheet_names, data_source_ids):
     ]
 
     response = spreadsheet.batch_update(
-        generate_pivot_table_request(source, data_source, unmapped_row_col_name, unmapped_value_col_name,
+        generate_pivot_table_request(data_source_type, data_source, unmapped_row_col_name, unmapped_value_col_name,
                                      unmapped_worksheet_id,
                                      pivot_table_location, "SUM", None, "lineItem_UsageType", None, None, None, None,
                                      None, False
@@ -594,7 +680,9 @@ def generate_bq_mc_sheets(spreadsheet, worksheet_names, data_source_ids):
         0  # Row 1
     ]
 
-    data_source = [data_source_ids[0]]
+    if data_source_type == "BQ":
+        data_source = [data_source_ids[0]]
+
     data_row_col_name = "Source_Product"
     data_value_col_name = "Source_Cost"
     data_value_2nd_col_name = "GCP_Cost"
@@ -602,7 +690,7 @@ def generate_bq_mc_sheets(spreadsheet, worksheet_names, data_source_ids):
     value_name_2nd = "GCP Cost"
 
     response = spreadsheet.batch_update(
-        generate_pivot_table_request(source, data_source, data_row_col_name, data_value_col_name,
+        generate_pivot_table_request(data_source_type, data_source, data_row_col_name, data_value_col_name,
                                      exec_overview_worksheet_id,
                                      pivot_table_location, "SUM", None, None, None, value_name,
                                      data_value_2nd_col_name,
@@ -668,9 +756,29 @@ def generate_bq_mc_sheets(spreadsheet, worksheet_names, data_source_ids):
         "textFormat": {"bold": True}
     })
 
+    # Set Exec Overview AWS Unmapped to Italic
+    exec_overview_worksheet.format("B2", {
+        "textFormat": {"italic": True}
+    })
+
     # Set Exec Overview Formulas Titles to Bold
     exec_overview_worksheet.format("G1:M1", {
         "textFormat": {"bold": True}
+    })
+
+    # Set Overview Formulas Totals to Percent
+    exec_overview_worksheet.format("G", {
+        "numberFormat": {"type": "PERCENT", "pattern": "0.0000%"}
+    })
+
+    # Set Overview Formulas Totals to Currency
+    exec_overview_worksheet.format("H", {
+        "numberFormat": {"type": "CURRENCY"}
+    })
+
+    # Set Overview Formulas Totals to Percent
+    exec_overview_worksheet.format("I", {
+        "numberFormat": {"type": "PERCENT", "pattern": "0.0000%"}
     })
 
     # Set Overview Cost Totals to Currency
@@ -683,13 +791,22 @@ def generate_bq_mc_sheets(spreadsheet, worksheet_names, data_source_ids):
         "numberFormat": {"type": "CURRENCY"}
     })
 
+    # Set Overview Cost Totals to Currency
+    exec_overview_worksheet.format("B7", {
+        "numberFormat": {"type": "PERCENT", "pattern": "0.0000%"}
+    })
+
+    gcp_overview_worksheet.format("E1:F1", {
+        "textFormat": {"bold": True}
+    })
+
     # Change Overview Cost Totals to Currency format
     gcp_overview_worksheet.format("C:E", {
         "numberFormat": {"type": "CURRENCY"}
     })
 
     gcp_overview_worksheet.format("F", {
-        "numberFormat": {"type": "PERCENT"}
+        "numberFormat": {"type": "PERCENT", "pattern": "0.0000%"}
     })
 
     # Change Region Cost Totals to Currency format
@@ -713,55 +830,20 @@ def generate_bq_mc_sheets(spreadsheet, worksheet_names, data_source_ids):
     })
 
     # Set up conditional rules (Red/Green) to GCP Overview Differences
-    overview_rule_red = ConditionalFormatRule(
-        ranges=[GridRange.from_a1_range('E2:F', gcp_overview_worksheet)],
-        booleanRule=BooleanRule(
-            condition=BooleanCondition('NUMBER_GREATER', ['0']),
-            format=CellFormat(textFormat=textFormat(foregroundColor=Color(1, 0, 0)))
-
-        )
-    )
-    overview_rule_green = ConditionalFormatRule(
-        ranges=[GridRange.from_a1_range('E2:F', gcp_overview_worksheet)],
-        booleanRule=BooleanRule(
-            condition=BooleanCondition('NUMBER_LESS', ['0']),
-            format=CellFormat(textFormat=textFormat(foregroundColor=Color(0, 1, 0)))
-
-        )
-    )
-
-    overview_rules = get_conditional_format_rules(gcp_overview_worksheet)
-    overview_rules.append(overview_rule_red)
-    overview_rules.append(overview_rule_green)
-    overview_rules.save()
+    apply_conditional_color_rule(gcp_overview_worksheet, "E2:F", "NUMBER_GREATER", "0", [1, 0, 0])
+    apply_conditional_color_rule(gcp_overview_worksheet, "E2:F", "NUMBER_LESS", "0", [0, 75, 0])
 
     # Set up conditional rules (Red/Green) to Exec Overview Differences
-    exec_rule_red = ConditionalFormatRule(
-        ranges=[GridRange.from_a1_range('B6', exec_overview_worksheet)],
-        booleanRule=BooleanRule(
-            condition=BooleanCondition('NUMBER_GREATER', ['0']),
-            format=CellFormat(textFormat=textFormat(foregroundColor=Color(1, 0, 0)))
+    apply_conditional_color_rule(exec_overview_worksheet, "B6", "NUMBER_GREATER", "0", [1, 0, 0])
+    apply_conditional_color_rule(exec_overview_worksheet, "B6", "NUMBER_LESS", "0", [0, 75, 0])
 
-        )
-    )
-
-    exec_rule_green = ConditionalFormatRule(
-        ranges=[GridRange.from_a1_range('B6', exec_overview_worksheet)],
-        booleanRule=BooleanRule(
-            condition=BooleanCondition('NUMBER_LESS', ['0']),
-            format=CellFormat(textFormat=textFormat(foregroundColor=Color(0, 1, 0)))
-
-        )
-    )
-
-    exec_rules = get_conditional_format_rules(exec_overview_worksheet)
-    exec_rules.append(exec_rule_red)
-    exec_rules.append(exec_rule_green)
-    exec_rules.save()
+    # Set up conditional rules (Red/Green) to Exec Overview Differences
+    apply_conditional_color_rule(exec_overview_worksheet, "H:I", "NUMBER_GREATER", "0", [1, 0, 0])
+    apply_conditional_color_rule(exec_overview_worksheet, "H:I", "NUMBER_LESS", "0", [0, 75, 0])
 
     # Autosize first cols in Overview worksheet
     first_col = 0
-    last_col = 10
+    last_col = 30
     res = spreadsheet.batch_update(autosize_worksheet(gcp_overview_worksheet_id, first_col, last_col))
 
     # Autosize first cols in Unmapped worksheet
@@ -945,7 +1027,7 @@ def generate_bq_cur_sheets(spreadsheet, worksheet_names, data_source_ids):
 
     # Autosize first cols in Overview worksheet
     first_col = 0
-    last_col = 10
+    last_col = 30
     res = spreadsheet.batch_update(autosize_worksheet(overview_worksheet_id, first_col, last_col))
 
     # Refresh all BQ Data sources (removes 'Apply' button from pivot tables)
@@ -1013,7 +1095,7 @@ def import_mc_data(mc_reports_directory, spreadsheet, credentials):
         # Autosize All Cols
         worksheet_id = current_worksheet._properties['sheetId']
         first_col = 0
-        last_col = 14
+        last_col = 20
         res = spreadsheet.batch_update(autosize_worksheet(worksheet_id, first_col, last_col))
 
     # mapped.csv Data Information
@@ -1158,7 +1240,7 @@ def import_mc_data(mc_reports_directory, spreadsheet, credentials):
                                    position_data))
     # Autosize first cols in GCP Overview worksheet
     first_col = 0
-    last_col = 10
+    last_col = 30
     res = spreadsheet.batch_update(autosize_worksheet(overview_worksheet_id, first_col, last_col))
 
     overview_worksheet.batch_update([{
@@ -1212,7 +1294,7 @@ def import_mc_data(mc_reports_directory, spreadsheet, credentials):
 
     # Autosize first cols in Unmapped Overview worksheet
     first_col = 0
-    last_col = 10
+    last_col = 30
     res = spreadsheet.batch_update(autosize_worksheet(unmapped_overview_worksheet_id, first_col, last_col))
 
     # Reorder worksheet tabs based on mc_names order
@@ -1732,7 +1814,7 @@ def main():
 
             pivot_table_location = [0, 0]
             if enable_bq_import is True:
-                generate_bq_mc_sheets(spreadsheet, worksheet_names, data_source_ids)
+                generate_mc_sheets(spreadsheet, worksheet_names, "BQ", data_source_ids)
                 exec_overview_worksheet = spreadsheet.worksheet("Executive Overview")
                 gcp_overview_worksheet = spreadsheet.worksheet("GCP Detailed Overview")
                 unmapped_worksheet = spreadsheet.worksheet("AWS Unmapped Overview")
