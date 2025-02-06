@@ -153,25 +153,25 @@ def generate_repeat_cell_formula_request(sheet_id, formula, start_column, start_
     end_column = start_column + 1
 
     body = {
-        "requests": [
-            {
-                "repeatCell": {
-                    "cell": {
-                        "userEnteredValue": {
-                            "formulaValue": formula
-                        }
-                    },
-                    "range": {
-                        "sheetId": sheet_id,
-                        "startColumnIndex": start_column,
-                        "endColumnIndex": end_column,
-                        "startRowIndex": start_row
-                    },
-                    "fields": "userEnteredValue.formulaValue"
+        # "requests": [
+        #     {
+        "repeatCell": {
+            "cell": {
+                "userEnteredValue": {
+                    "formulaValue": formula
                 }
-            }
-        ]
+            },
+            "range": {
+                "sheetId": sheet_id,
+                "startColumnIndex": start_column,
+                "endColumnIndex": end_column,
+                "startRowIndex": start_row
+            },
+            "fields": "userEnteredValue.formulaValue"
+        }
     }
+    #     ]
+    # }
     return body
 
 
@@ -192,7 +192,6 @@ def autosize_worksheet(sheet_id, first_col, last_col):
         ]
     }
 
-    time.sleep(1)
     return body
 
 
@@ -235,7 +234,25 @@ def connect_bq_to_sheets(gcp_project_id, bq_dataset_name, bq_table):
         ]
     }
 
-    time.sleep(1)
+    return body
+
+
+def generate_protect_sheet_request(sheet_id):
+    body = {
+        "requests": [
+            {
+                "addProtectedRange": {
+                    "protectedRange": {
+                        "range": {
+                            "sheetId": sheet_id,
+                        },
+                        "warningOnly": False
+                    }
+                }
+            }
+        ]
+    }
+
     return body
 
 
@@ -502,54 +519,45 @@ def generate_mc_sheets(spreadsheet, worksheet_names, data_source_type, data_sour
     elif data_source_type == "SHEETS":
         unmapped_data_column_formula = f"=SUM(\'{unmapped_data_worksheet}\'!K2:K)"
 
-    exec_overview_worksheet.batch_update([{
-        'range': "A1:A3",
-        'values': [["AWS Spend (GCP Matched)"], ["AWS Spend (Unmatched)"], ["AWS Total Spend"]],
-    }, {
-        'range': "B1:B3",
-        'values': [["=SUM(E2:E)"], [unmapped_data_column_formula], ["=B1+B2"]],
-    }]
+    exec_overview_worksheet.batch_update([
+        {
+            'range': "A1:A3",
+            'values': [["AWS Spend (GCP Matched)"], ["AWS Spend (Unmatched)"], ["AWS Total Spend"]],
+        }, {
+            'range': "B1:B3",
+            'values': [["=SUM(E2:E)"], [unmapped_data_column_formula], ["=B1+B2"]],
+        },
+        {
+            'range': "A5:A7",
+            'values': [["GCP Spend (AWS Matched)"], ["GCP Difference"], ["GCP % Difference"]],
+        }, {
+            'range': "B5:B7",
+            'values': [["=SUM(F2:F)"], ["=B5-B1"], ["=B6/B1"]],
+        },
+        {
+            'range': "G1:I1",
+            'values': [
+                ["% of AWS Total Spend", "GCP Cost Difference", "% GCP Difference"]],
+        }
+    ]
         , value_input_option="USER_ENTERED"
     )
-
-    exec_overview_worksheet.batch_update([{
-        'range': "A5:A7",
-        'values': [["GCP Spend (AWS Matched)"], ["GCP Difference"], ["GCP % Difference"]],
-    }, {
-        'range': "B5:B7",
-        'values': [["=SUM(F2:F)"], ["=B5-B1"], ["=B6/B1"]],
-    }]
-        , value_input_option="USER_ENTERED"
-    )
-
-    exec_overview_worksheet.batch_update([{
-        'range': "G1:I1",
-        'values': [
-            ["% of AWS Total Spend", "GCP Cost Difference", "% GCP Difference"]],
-    }]
-    )
-
-    gcp_discounts_worksheet.update_acell('A1', 'GCP VM Discounts')
-    gcp_discounts_worksheet.update_acell('G1', 'GCP Discounts')
 
     # Insert Formulas off of pivot tables for above columns
+    exec_overview_formula_json_request = {"requests":
+        [
+            generate_repeat_cell_formula_request(exec_overview_worksheet_id, "=IF(ISBLANK($E2), \"\", $E2/$B$3)", 6,
+                                                 1),
+            generate_repeat_cell_formula_request(exec_overview_worksheet_id, "=IF(ISBLANK($E2), \"\", $F2-$E2)", 7,
+                                                 1),
+            generate_repeat_cell_formula_request(exec_overview_worksheet_id,
+                                                 "=IF(ISBLANK($E2), \"\", if($F2<=0,\"No Google Cost\",($F2-$E2)/$E2))",
+                                                 8,
+                                                 1)
+        ]
+    }
 
-    # % of AWS Total Spend
-    response = spreadsheet.batch_update(
-        generate_repeat_cell_formula_request(exec_overview_worksheet_id, "=IF(ISBLANK($E2), \"\", $E2/$B$3)", 6, 1)
-    )
-
-    # Exec Overview - GCP Cost Difference
-    response = spreadsheet.batch_update(
-        generate_repeat_cell_formula_request(exec_overview_worksheet_id, "=IF(ISBLANK($E2), \"\", $F2-$E2)", 7, 1)
-    )
-
-    # Exec Overview - % GCP Difference
-    response = spreadsheet.batch_update(
-        generate_repeat_cell_formula_request(exec_overview_worksheet_id,
-                                             "=IF(ISBLANK($E2), \"\", if(F2<=0,\"No Google Cost\",($F2-$E2)/$E2))", 8,
-                                             1)
-    )
+    response = spreadsheet.batch_update(exec_overview_formula_json_request)
 
     gcp_overview_worksheet.batch_update([{
         'range': "D1:E1",
@@ -559,79 +567,65 @@ def generate_mc_sheets(spreadsheet, worksheet_names, data_source_type, data_sour
     )
 
     # GCP Details - GCP Cost Difference
-    response = spreadsheet.batch_update(
-        generate_repeat_cell_formula_request(gcp_overview_worksheet_id, "=IF(ISBLANK($B2), \"\", $C2-$B2)", 3, 1)
+    gcp_overview_formula_json_request = {"requests":
+        [
+            generate_repeat_cell_formula_request(gcp_overview_worksheet_id, "=IF(ISBLANK($B2), \"\", $C2-$B2)", 3, 1),
+            generate_repeat_cell_formula_request(gcp_overview_worksheet_id,
+                                                 "=IF(ISBLANK($B2), \"\", if($C2<=0,\"No Google Cost\",($C2-$B2)/$B2))",
+                                                 4,
+                                                 1),
+        ]
+    }
+
+    response = spreadsheet.batch_update(gcp_overview_formula_json_request)
+
+    # GCP % Discounts & GCP Discounted Price
+    gcp_discounts_formula_json_request = {"requests":
+        [
+            generate_repeat_cell_formula_request(gcp_discounts_worksheet_id, "=IF(ISBLANK($C3), \"\", 0)", 3, 2),
+            generate_repeat_cell_formula_request(gcp_discounts_worksheet_id,
+                                                 "=IF(ISBLANK($C3), \"\", if($C3<=0,\"No Google Cost\",(1-$D3)*$C3))",
+                                                 4,
+                                                 2),
+            generate_repeat_cell_formula_request(gcp_discounts_worksheet_id, "=IF(ISBLANK($J3), \"\", $I3+$J3)", 10, 2),
+            generate_repeat_cell_formula_request(gcp_discounts_worksheet_id, "=IF(ISBLANK($J3), \"\", 0)", 11, 2),
+            generate_repeat_cell_formula_request(gcp_discounts_worksheet_id,
+                                                 "=IF(ISBLANK($J3), \"\", if($J3<=0,\"No Google Cost\",((1-$L3)*$J3)+$I3))",
+                                                 12,
+                                                 2)
+        ]
+    }
+    response = spreadsheet.batch_update(gcp_discounts_formula_json_request)
+
+    gcp_discounts_worksheet.batch_update([
+        {
+            'range': "A1",
+            'values': [
+                ["GCP VM Discounts"]],
+        },
+        {
+            'range': "G1",
+            'values': [
+                ["GCP Discounts"]],
+        },
+        {
+            'range': "D2:E2",
+            'values': [
+                ["GCP Discount", "GCP Discounted Price"]],
+        },
+        {
+            'range': "K2:M2",
+            'values': [
+                ["GCP Total", "GCP Discount*", "GCP Discounted Price"]],
+        },
+        {
+            'range': "Q2",
+            'values': [
+                ["* - Discount is only applied to Infra Cost"]],
+        }
+
+    ]
     )
-
-    # GCP Details - % GCP Difference
-    response = spreadsheet.batch_update(
-        generate_repeat_cell_formula_request(gcp_overview_worksheet_id,
-                                             "=IF(ISBLANK($B2), \"\", if(C2<=0,\"No Google Cost\",($C2-$B2)/$B2))", 4,
-                                             1)
-    )
-
-    # Add sleep to prevent hammering API
-    time.sleep(3)
-
-    gcp_discounts_worksheet.batch_update([{
-        'range': "D3:E3",
-        'values': [
-            ["GCP Discount", "GCP Discounted Price"]],
-    }]
-    )
-
-    # GCP Discounts
-    response = spreadsheet.batch_update(
-        generate_repeat_cell_formula_request(gcp_discounts_worksheet_id, "=IF(ISBLANK($C4), \"\", 0)", 3, 3)
-    )
-
-    # GCP Discounted Price
-    response = spreadsheet.batch_update(
-        generate_repeat_cell_formula_request(gcp_discounts_worksheet_id,
-                                             "=IF(ISBLANK($C4), \"\", if(C4<=0,\"No Google Cost\",(1-$D4)*$C4))", 4,
-                                             3)
-    )
-
-    gcp_discounts_worksheet.batch_update([{
-        'range': "J3:K3",
-        'values': [
-            ["GCP Discount", "GCP Discounted Price"]],
-    }]
-    )
-
-    # GCP Discounts
-    response = spreadsheet.batch_update(
-        generate_repeat_cell_formula_request(gcp_discounts_worksheet_id, "=IF(ISBLANK($I4), \"\", 0)", 9, 3)
-    )
-
-    # GCP Discounted Price
-    response = spreadsheet.batch_update(
-        generate_repeat_cell_formula_request(gcp_discounts_worksheet_id,
-                                             "=IF(ISBLANK($I4), \"\", if(I4<=0,\"No Google Cost\",(1-$J4)*$I4))", 10,
-                                             3)
-    )
-
-    # gcp_discounts_worksheet.batch_update([{
-    #     'range': "P3:Q3",
-    #     'values': [
-    #         ["GCP Discount", "GCP Discounted Price"]],
-    # }]
-    # )
-    #
-    # # GCP Discounts
-    # response = spreadsheet.batch_update(
-    #     generate_repeat_cell_formula_request(gcp_discounts_worksheet_id, "=IF(ISBLANK($O4), \"\", 0)", 15, 3)
-    # )
-    #
-    # # GCP Discounted Price
-    # response = spreadsheet.batch_update(
-    #     generate_repeat_cell_formula_request(gcp_discounts_worksheet_id,
-    #                                          "=IF(ISBLANK($O4), \"\", if(O4<=0,\"No Google Cost\",(1-$P4)*$O4))", 16,
-    #                                          3)
-    # )
-
-    # Add sleep to prevent hammering API
-    time.sleep(3)
 
     # Add Cost sums to Overview Worksheet. Filter on GCP Cost column being greater than 0.
     pivot_table_location = [
@@ -691,7 +685,8 @@ def generate_mc_sheets(spreadsheet, worksheet_names, data_source_type, data_sour
     response = spreadsheet.batch_update(
         generate_pivot_table_request(data_source_type, data_source_id, data_row_col, data_value_col,
                                      gcp_overview_worksheet_id,
-                                     pivot_table_location, "SUM", None, data_row_col_2nd, None, "GCP Cost", None, None, filter_column,
+                                     pivot_table_location, "SUM", None, data_row_col_2nd, None, "GCP Cost", None, None,
+                                     filter_column,
                                      False
                                      ))
 
@@ -782,9 +777,9 @@ def generate_mc_sheets(spreadsheet, worksheet_names, data_source_type, data_sour
         data_source_id = [data_source["mapped"]["worksheet_id"].id, data_source["mapped"]["csv_header_length"],
                           data_source["mapped"]["csv_num_rows"]]
 
-    data_row_col_name = "Source_Product"
-    data_value_col_name = "Source_Cost"
-    data_value_2nd_col_name = "GCP_Cost"
+    # data_row_col_name = "Source_Product"
+    # data_value_col_name = "Source_Cost"
+    # data_value_2nd_col_name = "GCP_Cost"
     value_name = "AWS Cost"
     value_name_2nd = "GCP Cost"
 
@@ -815,7 +810,7 @@ def generate_mc_sheets(spreadsheet, worksheet_names, data_source_type, data_sour
     # Add VM Discounts to Discounts worksheet. Filter on Destination_series not being empty.
     pivot_table_location = [
         0,  # Column A
-        2  # Row 2
+        1  # Row 2
     ]
 
     if data_source_type == "BQ":
@@ -828,7 +823,7 @@ def generate_mc_sheets(spreadsheet, worksheet_names, data_source_type, data_sour
         data_source_id = [data_source["mapped"]["worksheet_id"].id, data_source["mapped"]["csv_header_length"],
                           data_source["mapped"]["csv_num_rows"]]
         data_row_col = 9  # Data, Column J, Destination_Series
-        data_row_col_2nd = 11   # Data, Column L, Type
+        data_row_col_2nd = 11  # Data, Column L, Type
         data_value_col = 23  # Data, Column X, GCP_Cost
         filter_column = 9  # Data, Column J, Destination_Series
 
@@ -847,41 +842,57 @@ def generate_mc_sheets(spreadsheet, worksheet_names, data_source_type, data_sour
     # Add GCP Discounts to Discounts worksheet.
     pivot_table_location = [
         6,  # Column G
-        2  # Row 2
+        1  # Row 2
     ]
 
     if data_source_type == "BQ":
         data_source_id = [data_source[0]]
         data_row_col = "GCP_Service"
         data_row_col_2nd = "Sub_Type_1"
-        data_value_col = "GCP_Cost"
+        data_value_col = "OS_Licenses_Cost"
+        data_value_col_2nd = "Infra_Cost"
+
         filter_column = "Sub_Type_1"
     elif data_source_type == "SHEETS":
         data_source_id = [data_source["mapped"]["worksheet_id"].id, data_source["mapped"]["csv_header_length"],
                           data_source["mapped"]["csv_num_rows"]]
         data_row_col = 5  # Data, Column F, GCP_Service
         data_row_col_2nd = 12  # Data, Column M, Sub_Type_1
-        data_value_col = 23  # Data, Column X, GCP_Cost
+        data_value_col = 22  # Data, Column W, OS_Licenses_Cost
+        data_value_col_2nd = 21  # Data, Column V, Infra_Cost
         filter_column = 5  # Data, Column F, Sub_Type_1
 
-    value_name = "GCP Cost"
+    value_name = "License Cost"
+    value_name_2nd = "Infra Cost"
 
     response = spreadsheet.batch_update(
         generate_pivot_table_request(data_source_type, data_source_id, data_row_col, data_value_col,
                                      gcp_discounts_worksheet_id,
                                      pivot_table_location, "SUM", None, data_row_col_2nd, None, value_name,
-                                     None,
-                                     None, filter_column, False
+                                     data_value_col_2nd, value_name_2nd, filter_column, False
                                      ),
 
     )
 
+    # Add Piechart for GCP Cost Breakdown
+    chart_title = "GCP Migration Breakdown"
+    piechart_row_col = 3  # Column D
+    piechart_value_col = 5  # Column F
+    position_data = [
+        10,  # Column K
+        0  # Row 21
+    ]
+
+    res = spreadsheet.batch_update(
+        generate_pie_table_request(exec_overview_worksheet_id, chart_title, piechart_row_col, piechart_value_col,
+                                   position_data))
+
     # Add Piechart for GCP Services
     chart_title = "GCP Services Breakdown"
-    piechart_row_col = 0  # Column A
-    piechart_value_col = 2  # Column C
+    piechart_row_col = 0  # Column D
+    piechart_value_col = 2  # Column F
     position_data = [
-        14,  # Column 0
+        14,  # Column O
         0  # Row 1
     ]
 
@@ -889,16 +900,13 @@ def generate_mc_sheets(spreadsheet, worksheet_names, data_source_type, data_sour
         generate_pie_table_request(gcp_overview_worksheet_id, chart_title, piechart_row_col, piechart_value_col,
                                    position_data))
 
-    # Add sleep to prevent hammering API
-    time.sleep(5)
-
     # Add Piechart for GCP Services
     chart_title = "GCP Regions Breakdown"
     piechart_row_col = 6  # Column G
     piechart_value_col = 8  # Column I
     position_data = [
         14,  # Column 0
-        21  # Row 1
+        21  # Row 21
     ]
 
     res = spreadsheet.batch_update(
@@ -931,138 +939,264 @@ def generate_mc_sheets(spreadsheet, worksheet_names, data_source_type, data_sour
         generate_pie_table_request(unmapped_worksheet_id, chart_title, piechart_row_col, piechart_value_col,
                                    position_data))
 
-    # Set Exec Overview AWS Titles to Bold
-    exec_overview_worksheet.format("A1:A7", {
-        "textFormat": {"bold": True}
-    })
+    exec_overview_formats = [
+        {
+            "range": "A1:A7",
+            "format": {
+                "textFormat": {
+                    "bold": True,
+                },
+            },
+        },
+        {
+            "range": "B2",
+            "format": {
+                "textFormat": {
+                    "italic": True,
+                },
+            },
+        },
+        {
+            "range": "G1:M1",
+            "format": {
+                "textFormat": {
+                    "bold": True,
+                },
+            },
+        },
+        {
+            "range": "G",
+            "format": {
+                "numberFormat":
+                    {
+                        "type": "PERCENT",
+                        "pattern": "0.0000%"
+                    },
+            },
+        },
+        {
+            "range": "H",
+            "format": {
+                "numberFormat":
+                    {
+                        "type": "CURRENCY"
+                    },
+            },
+        },
+        {
+            "range": "I",
+            "format": {
+                "numberFormat":
+                    {
+                        "type": "PERCENT",
+                        "pattern": "0.0000%"
+                    },
+            },
+        },
+        {
+            "range": "B",
+            "format": {
+                "numberFormat":
+                    {
+                        "type": "CURRENCY"
+                    },
+            },
+        },
+        {
+            "range": "E:F",
+            "format": {
+                "numberFormat":
+                    {
+                        "type": "CURRENCY"
+                    },
+            },
+        },
+        {
+            "range": "B7",
+            "format": {
+                "numberFormat":
+                    {
+                        "type": "PERCENT",
+                        "pattern": "0.0000%"
+                    },
+            },
+        },
+    ]
 
-    # Set Exec Overview AWS Unmapped to Italic
-    exec_overview_worksheet.format("B2", {
-        "textFormat": {"italic": True}
-    })
+    exec_overview_worksheet.batch_format(exec_overview_formats)
 
-    # Set Exec Overview Formulas Titles to Bold
-    exec_overview_worksheet.format("G1:M1", {
-        "textFormat": {"bold": True}
-    })
+    gcp_overview_worksheet_formats = [
+        {
+            "range": "D1:E1",
+            "format": {
+                "textFormat": {
+                    "bold": True,
+                },
+            },
+        },
+        {
+            "range": "B:D",
+            "format": {
+                "numberFormat":
+                    {
+                        "type": "CURRENCY"
+                    },
+            },
+        },
+        {
+            "range": "E",
+            "format": {
+                "numberFormat":
+                    {
+                        "type": "PERCENT",
+                        "pattern": "0.0000%"
+                    },
+            },
+        },
+        {
+            "range": "I",
+            "format": {
+                "numberFormat":
+                    {
+                        "type": "CURRENCY"
+                    },
+            },
+        },{
+            "range": "M",
+            "format": {
+                "numberFormat":
+                    {
+                        "type": "CURRENCY"
+                    },
+            },
+        },
+    ]
 
-    # Set Overview Formulas Totals to Percent
-    exec_overview_worksheet.format("G", {
-        "numberFormat": {"type": "PERCENT", "pattern": "0.0000%"}
-    })
+    gcp_overview_worksheet.batch_format(gcp_overview_worksheet_formats)
 
-    # Set Overview Formulas Totals to Currency
-    exec_overview_worksheet.format("H", {
-        "numberFormat": {"type": "CURRENCY"}
-    })
+    unmapped_worksheet_formats = [
+        {
+            "range": "B",
+            "format": {
+                "numberFormat":
+                    {
+                        "type": "CURRENCY"
+                    },
+            },
+        },
+        {
+            "range": "F",
+            "format": {
+                "numberFormat":
+                    {
+                        "type": "CURRENCY"
+                    },
+            },
+        },
+    ]
 
-    # Set Overview Formulas Totals to Percent
-    exec_overview_worksheet.format("I", {
-        "numberFormat": {"type": "PERCENT", "pattern": "0.0000%"}
-    })
+    unmapped_worksheet.batch_format(unmapped_worksheet_formats)
 
-    # Set Overview Cost Totals to Currency
-    exec_overview_worksheet.format("B", {
-        "numberFormat": {"type": "CURRENCY"}
-    })
+    gcp_discounts_worksheet_formats = [
+        {
+            "range": "A1",
+            "format": {
+                "textFormat": {
+                    "bold": True,
+                },
+            },
+        },
+        {
+            "range": "G1",
+            "format": {
+                "textFormat": {
+                    "bold": True,
+                },
+            },
+        },
+        {
+            "range": "D2:E2",
+            "format": {
+                "textFormat": {
+                    "bold": True,
+                },
+            },
+        },
+        {
+            "range": "K2:M2",
+            "format": {
+                "textFormat": {
+                    "bold": True,
+                },
+            },
+        },
+        {
+            "range": "C",
+            "format": {
+                "numberFormat":
+                    {
+                        "type": "CURRENCY"
+                    },
+            },
+        },
+        {
+            "range": "D",
+            "format": {
+                "numberFormat":
+                    {
+                        "type": "PERCENT",
+                        "pattern": "0.0000%"
+                    },
+            },
+        },
+        {
+            "range": "E",
+            "format": {
+                "numberFormat":
+                    {
+                        "type": "CURRENCY"
+                    },
+            },
+        },
+        {
+            "range": "I:K",
+            "format": {
+                "numberFormat":
+                    {
+                        "type": "CURRENCY"
+                    },
+            },
+        },
+        {
+            "range": "L",
+            "format": {
+                "numberFormat":
+                    {
+                        "type": "PERCENT",
+                        "pattern": "0.0000%"
+                    },
+            },
+        },
+        {
+            "range": "M",
+            "format": {
+                "numberFormat":
+                    {
+                        "type": "CURRENCY"
+                    },
+            },
+        },
+        {
+            "range": "Q2",
+            "format": {
+                "textFormat": {
+                    "italic": True,
+                },
+            },
+        },
+    ]
 
-    # Set Overview Cost Totals to Currency
-    exec_overview_worksheet.format("E:F", {
-        "numberFormat": {"type": "CURRENCY"}
-    })
-
-    # Set Overview Cost Totals to Currency
-    exec_overview_worksheet.format("B7", {
-        "numberFormat": {"type": "PERCENT", "pattern": "0.0000%"}
-    })
-
-    # Add sleep to prevent hammering API
-    time.sleep(3)
-
-    gcp_overview_worksheet.format("D1:E1", {
-        "textFormat": {"bold": True}
-    })
-
-    # Change Overview Cost Totals to Currency format
-    gcp_overview_worksheet.format("B:D", {
-        "numberFormat": {"type": "CURRENCY"}
-    })
-
-    gcp_overview_worksheet.format("E", {
-        "numberFormat": {"type": "PERCENT", "pattern": "0.0000%"}
-    })
-
-    # Change Region Cost Totals to Currency format
-    gcp_overview_worksheet.format("I", {
-        "numberFormat": {"type": "CURRENCY"}
-    })
-
-    # Change Instance Cost Totals to Currency format
-    gcp_overview_worksheet.format("M", {
-        "numberFormat": {"type": "CURRENCY"}
-    })
-
-    # Change Unmapped Cost Totals to Currency format
-    unmapped_worksheet.format("B", {
-        "numberFormat": {"type": "CURRENCY"}
-    })
-
-    # Change Unmapped Services Details Totals to Currency format
-    unmapped_worksheet.format("F", {
-        "numberFormat": {"type": "CURRENCY"}
-    })
-
-    # Add sleep to prevent hammering API
-    time.sleep(3)
-
-    gcp_discounts_worksheet.format("A1", {
-        "textFormat": {"bold": True}
-    })
-
-    gcp_discounts_worksheet.format("G1", {
-        "textFormat": {"bold": True}
-    })
-
-    gcp_discounts_worksheet.format("D3:E3", {
-        "textFormat": {"bold": True}
-    })
-
-    gcp_discounts_worksheet.format("J3:K3", {
-        "textFormat": {"bold": True}
-    })
-
-    # Change GCP Discounts Totals to Currency format
-    gcp_discounts_worksheet.format("C", {
-        "numberFormat": {"type": "CURRENCY"}
-    })
-
-    # Change GCP Discounts Totals to Currency format
-    gcp_discounts_worksheet.format("D", {
-        "numberFormat": {"type": "PERCENT", "pattern": "0.0000%"}
-    })
-
-    # Add sleep to prevent hammering API
-    time.sleep(3)
-
-    # Change GCP Discounts Totals to Currency format
-    gcp_discounts_worksheet.format("E", {
-        "numberFormat": {"type": "CURRENCY"}
-    })
-
-    # Change GCP Discounts Totals to Currency format
-    gcp_discounts_worksheet.format("I", {
-        "numberFormat": {"type": "CURRENCY"}
-    })
-
-    # Change GCP Discounts Totals to Currency format
-    gcp_discounts_worksheet.format("J", {
-        "numberFormat": {"type": "PERCENT", "pattern": "0.0000%"}
-    })
-
-    # Change GCP Discounts Totals to Currency format
-    gcp_discounts_worksheet.format("K", {
-        "numberFormat": {"type": "CURRENCY"}
-    })
+    gcp_discounts_worksheet.batch_format(gcp_discounts_worksheet_formats)
 
     # Set up conditional rules (Red/Green) to GCP Overview Differences
     apply_conditional_color_rule(gcp_overview_worksheet, "D2:E", "NUMBER_GREATER", "0", [1, 0, 0])
@@ -1095,7 +1229,8 @@ def generate_mc_sheets(spreadsheet, worksheet_names, data_source_type, data_sour
     spreadsheet.del_worksheet(worksheet)
 
     # Reorder Worksheets
-    spreadsheet.reorder_worksheets([exec_overview_worksheet, gcp_overview_worksheet, unmapped_worksheet, gcp_discounts_worksheet])
+    spreadsheet.reorder_worksheets(
+        [exec_overview_worksheet, gcp_overview_worksheet, unmapped_worksheet, gcp_discounts_worksheet])
 
 
 def generate_bq_cur_sheets(spreadsheet, worksheet_names, data_source_ids):
@@ -1328,6 +1463,8 @@ def import_mc_data_sheets(mc_reports_directory, spreadsheet, credentials):
                 params={'valueInputOption': 'USER_ENTERED'},
                 body={'values': list(csv.reader(open(file_fullpath)))})
 
+            response = sh.batch_update(generate_protect_sheet_request(worksheet._properties['sheetId']))
+
     data_source = {
         "mapped": {
             "worksheet_id": sh.worksheet(mc_names["mapped"]),
@@ -1343,277 +1480,6 @@ def import_mc_data_sheets(mc_reports_directory, spreadsheet, credentials):
     }
 
     return data_source
-
-
-# Import mc data from provided reports directory
-def import_mc_data_old(mc_reports_directory, spreadsheet, credentials):
-    sheets_id = spreadsheet.id
-    mc_data = {}
-    # Grabbing a list of files from the provided mc directory
-    try:
-        mc_file_list = os.listdir(mc_reports_directory)
-        print("Importing pricing report data...")
-    except:
-        print("Unable to access directory: " + mc_reports_directory)
-        exit()
-
-    client = gspread.authorize(credentials)
-    sh = client.open_by_key(sheets_id)
-
-    # Importing all CSV files into a dictionary of dataframes
-    for file in mc_file_list:
-        if file.endswith(".csv"):
-            file_fullpath = (mc_reports_directory + "/" + file)
-            file_name, _ = file.rsplit(".csv")
-            sheet_name = mc_names[file_name]
-            mc_data[file_name] = pd.read_csv(file_fullpath)
-
-            worksheet = sh.add_worksheet(title=sheet_name, rows=100, cols=20)
-            sh.values_update(
-                # file.rsplit(".csv"),
-                sheet_name,
-                params={'valueInputOption': 'USER_ENTERED'},
-                body={'values': list(csv.reader(open(file_fullpath)))})
-
-    # Delete default worksheet
-    worksheet = sh.worksheet("Sheet1")
-    sh.del_worksheet(worksheet)
-
-    mc_names_list = []
-    # Create GCP Overview Sheets Pivot Table
-    overview_worksheets_name = "GCP Overview"
-    overview_worksheet = spreadsheet.add_worksheet(overview_worksheets_name, 60, 25)
-    overview_worksheet_id = overview_worksheet._properties['sheetId']
-    mc_names_list.append(overview_worksheet)
-
-    # Create Unmapped Overview Sheets Pivot Table
-    unmapped_overview_worksheets_name = "Unmapped Overview"
-    unmapped_overview_worksheet = spreadsheet.add_worksheet(unmapped_overview_worksheets_name, 60, 25)
-    unmapped_overview_worksheet_id = unmapped_overview_worksheet._properties['sheetId']
-    mc_names_list.append(unmapped_overview_worksheet)
-
-    # Get worksheet names & add them to a list to reorder
-    for name in mc_names.keys():
-        current_worksheet = spreadsheet.worksheet(mc_names[name])
-        mc_names_list.append(current_worksheet)
-
-        # Set Filter on all column headers
-        current_worksheet.set_basic_filter()
-
-        # Freeze First Row / Column Headers
-        set_frozen(current_worksheet, rows=1)
-
-        # Autosize All Cols
-        worksheet_id = current_worksheet._properties['sheetId']
-        first_col = 0
-        last_col = 20
-        res = spreadsheet.batch_update(autosize_worksheet(worksheet_id, first_col, last_col))
-
-    # mapped.csv Data Information
-    mapped_worksheet_id = spreadsheet.worksheet(mc_names["mapped"])
-    mapped_csv_header_length = 25 + 1
-    mapped_csv_num_rows = len(mc_data["mapped"]) + 1
-
-    # unmapped.csv Data Information
-    unmapped_worksheet_id = spreadsheet.worksheet(mc_names["unmapped"])
-    unmapped_csv_header_length = 25 + 1
-    unmapped_csv_num_rows = len(mc_data["unmapped"]) + 1
-
-    # Create pivot table of GCP Services & Total cost for each. Filter on values_column_offset/GCP Cost being greater than 0.
-    rows_column_offset = 5  # Data, Column F
-    values_column_offset = 23  # Data, Column X, GCP Cost
-    values_column_offset_2nd = 19  # Data, Column T, AWS Cost
-    location_data = [4, 0]  # Cell: Column E, Row 1
-
-    source = "SHEETS"
-    data_source = [mapped_worksheet_id.id, mapped_csv_header_length, mapped_csv_num_rows]
-
-    print(source, data_source, rows_column_offset, values_column_offset,
-                                     overview_worksheet_id,
-                                     location_data, "SUM", None, None, None, "GCP Cost", values_column_offset_2nd,
-                                     "AWS Cost", None, False)
-    response = spreadsheet.batch_update(
-        generate_pivot_table_request(source, data_source, rows_column_offset, values_column_offset,
-                                     overview_worksheet_id,
-                                     location_data, "SUM", None, None, None, "GCP Cost", values_column_offset_2nd,
-                                     "AWS Cost", None, False
-                                     ))
-
-    # Create pivot table of GCP Regions & Total cost for each. Filter on values_column_offset/GCP Cost being greater than 0.
-    rows_column_offset = 7  # Data, Column H, Region
-    values_column_offset = 23  # Data, Column X, GCP Cost
-    location_data = [8, 0]  # Cell: Column I, Row 1
-
-    source = "SHEETS"
-    data_source = [mapped_worksheet_id.id, mapped_csv_header_length, mapped_csv_num_rows]
-
-    response = spreadsheet.batch_update(
-        generate_pivot_table_request(source, data_source, rows_column_offset, values_column_offset,
-                                     overview_worksheet_id,
-                                     location_data, "SUM", None, None, None, "GCP Cost", None,
-                                     None, None, False
-                                     ))
-
-    # Create pivot table of GCP Machine types & totals for each. Filter on rows_column_offset/Destination Shape not being None
-    rows_column_offset = 10  # Data, Column K
-    values_column_offset = 23  # Data, Column K
-    location_data = [11, 0]  # Cell: Column L, Row 1
-
-    data_source = [mapped_worksheet_id.id, mapped_csv_header_length, mapped_csv_num_rows]
-
-    response = spreadsheet.batch_update(
-        generate_pivot_table_request(source, data_source, rows_column_offset, values_column_offset,
-                                     overview_worksheet_id,
-                                     location_data, "SUM", None, None, None, "GCP Cost", None,
-                                     None, rows_column_offset, False
-                                     ))
-
-    # Add Piechart of GCP Machine types in GCP Overview
-    chart_title = "GCP Services Breakdown"
-    first_column = 4  # Col E
-    second_column = 5  # Col F
-
-    position_data = [
-        14,  # Column O
-        0  # Row 1
-    ]
-
-    res = spreadsheet.batch_update(
-        generate_pie_table_request(overview_worksheet_id, chart_title, first_column, second_column, position_data))
-
-    # Add Piechart of GCP Regions
-    chart_title = "GCP Regions Breakdown"
-    first_column = 8  # Col I
-    second_column = 9  # Col J
-
-    position_data = [
-        14,  # Column O
-        21  # Row 1
-    ]
-
-    res = spreadsheet.batch_update(
-        generate_pie_table_request(overview_worksheet_id, chart_title, first_column, second_column, position_data))
-
-    # Add Piechart for Instances
-    chart_title = "GCP Instances Breakdown"
-    first_column = 11  # Col L
-    second_column = 12  # Col M
-
-    position_data = [
-        14,  # Column O
-        42  # Row 20
-    ]
-
-    res = spreadsheet.batch_update(
-        generate_pie_table_request(overview_worksheet_id, chart_title, first_column, second_column, position_data))
-
-    # Create pivot table of Unmapped Services & Total cost for each. Filter on values_column_offset/AWS unblended Cost being greater than 0.
-    rows_column_offset = 2  # Data, Column C
-    values_column_offset = 9  # Data, Column V
-    position_data = [
-        0,  # Column A
-        0  # Row 1
-    ]
-
-    data_source = [unmapped_worksheet_id.id, unmapped_csv_header_length, unmapped_csv_num_rows]
-
-    response = spreadsheet.batch_update(
-        generate_pivot_table_request(source, data_source, rows_column_offset, values_column_offset,
-                                     unmapped_overview_worksheet_id,
-                                     position_data, "SUM", None, None, None, "AWS Unmapped Cost", None,
-                                     None, None, False
-                                     ))
-
-    # Create pivot table of Unmapped Services, Products, & Total cost for each.
-    rows_column_offset = 2  # Data, Column C
-    values_column_offset = 9  # Data, Column V
-    position_data = [
-        3,  # Column D
-        0  # Row 1
-    ]
-    data_source = [unmapped_worksheet_id.id, unmapped_csv_header_length, unmapped_csv_num_rows]
-
-    response = spreadsheet.batch_update(
-        generate_pivot_table_request(source, data_source, rows_column_offset, values_column_offset,
-                                     unmapped_overview_worksheet_id,
-                                     position_data, "SUM", None, 4, None, "AWS Unmapped Cost", None,
-                                     None, None, False
-                                     ))
-
-    # Add Pie chart of Unmapped Services Unmapped Overview
-    chart_title = "Unmapped Services Breakdown"
-    first_column = 0  # Col A
-    second_column = 1  # Col B
-
-    position_data = [
-        7,  # Column H
-        0  # Row 1
-    ]
-
-    res = spreadsheet.batch_update(
-        generate_pie_table_request(unmapped_overview_worksheet.id, chart_title, first_column, second_column,
-                                   position_data))
-    # Autosize first cols in GCP Overview worksheet
-    first_col = 0
-    last_col = 30
-    res = spreadsheet.batch_update(autosize_worksheet(overview_worksheet_id, first_col, last_col))
-
-    overview_worksheet.batch_update([{
-        'range': "A1:C1",
-        'values': [["GCP Total Cost", "AWS Equivalent Cost", "AWS Unmapped Cost"]],
-    }, {
-        'range': "A2:C2",
-        'values': [["=SUM(F2:F)", "=SUM(G2:G)", "=SUM('Unmapped Overview'!B2:B)"]],
-    }]
-        , value_input_option="USER_ENTERED"
-    )
-
-    # Set Overview Cost Totals to Bold
-    overview_worksheet.format("A1:C1", {
-        "textFormat": {"bold": True}
-    })
-
-    # Set Overview Cost Totals to Currency
-    overview_worksheet.format("A2:C2", {
-        "numberFormat": {"type": "CURRENCY"}
-    })
-
-    # Change Overview Cost Totals to Currency format
-    overview_worksheet.format("F", {
-        "numberFormat": {"type": "CURRENCY"}
-    })
-
-    overview_worksheet.format("G", {
-        "numberFormat": {"type": "CURRENCY"}
-    })
-
-    # Change Overview Cost Totals to Currency format
-    overview_worksheet.format("J", {
-        "numberFormat": {"type": "CURRENCY"}
-    })
-
-    # Change Overview Cost Totals to Currency format
-    overview_worksheet.format("M", {
-        "numberFormat": {"type": "CURRENCY"}
-    })
-
-    # Change Unmapped Cost Totals to Currency format
-    unmapped_overview_worksheet.format("B", {
-        "numberFormat": {"type": "CURRENCY"}
-    })
-
-    # Change Unmapped Cost Totals to Currency format
-    unmapped_overview_worksheet.format("F", {
-        "numberFormat": {"type": "CURRENCY"}
-    })
-
-    # Autosize first cols in Unmapped Overview worksheet
-    first_col = 0
-    last_col = 30
-    res = spreadsheet.batch_update(autosize_worksheet(unmapped_overview_worksheet_id, first_col, last_col))
-
-    # Reorder worksheet tabs based on mc_names order
-    spreadsheet.reorder_worksheets(mc_names_list)
 
 
 def google_auth(service_account_key, scope):
@@ -2132,8 +1998,11 @@ def main():
                 # Get dataource ID from batch update response
                 data_source_ids.append(response['replies'][0]['addDataSource']['dataSource']['dataSourceId'])
                 # print(response)
-                if 'unmapped' in response['replies'][0]['addDataSource']['dataSource']['spec']['bigQuery']['tableSpec']['tableId']:
-                    unmapped_worksheet_name = response['replies'][0]['addDataSource']['dataSource']['spec']['bigQuery']['tableSpec']['tableId']
+                if 'unmapped' in response['replies'][0]['addDataSource']['dataSource']['spec']['bigQuery']['tableSpec'][
+                    'tableId']:
+                    unmapped_worksheet_name = \
+                        response['replies'][0]['addDataSource']['dataSource']['spec']['bigQuery']['tableSpec'][
+                            'tableId']
 
             pivot_table_location = [0, 0]
             if enable_bq_import is True:
