@@ -1370,40 +1370,76 @@ def generate_bq_cur_sheets(spreadsheet, worksheet_names, data_source_ids):
         , value_input_option="USER_ENTERED"
     )
 
-    # Set AWS Cost Totals to Bold
-    overview_worksheet.format("A1", {
-        "textFormat": {"bold": True}
-    })
+    overview_worksheet_formats = [
+        {
+            "range": "A1",
+            "format": {
+                "textFormat": {
+                    "bold": True,
+                },
+            },
+        },
+        {
+            "range": "A2",
+            "format": {
+                "numberFormat":
+                    {
+                        "type": "CURRENCY"
+                    },
+            },
+        },
+        {
+            "range": "D",
+            "format": {
+                "numberFormat":
+                    {
+                        "type": "CURRENCY"
+                    },
+            },
+        },
+        {
+            "range": "G",
+            "format": {
+                "numberFormat":
+                    {
+                        "type": "CURRENCY"
+                    },
+            },
+        },{
+            "range": "J",
+            "format": {
+                "numberFormat":
+                    {
+                        "type": "CURRENCY"
+                    },
+            },
+        },
+    ]
 
-    # Set AWS Cost Totals to Currency
-    overview_worksheet.format("A2", {
-        "numberFormat": {"type": "CURRENCY"}
-    })
+    overview_worksheet.batch_format(overview_worksheet_formats)
 
-    # Change Services Cost Totals to Currency format
-    overview_worksheet.format("D", {
-        "numberFormat": {"type": "CURRENCY"}
-    })
+    details_worksheet_formats = [
+        {
+            "range": "C",
+            "format": {
+                "numberFormat":
+                    {
+                        "type": "CURRENCY"
+                    },
+            },
+        },
+        {
+            "range": "G",
+            "format": {
+                "numberFormat":
+                    {
+                        "type": "CURRENCY"
+                    },
+            },
+        },
+    ]
 
-    # Change Region Cost Totals to Currency format
-    overview_worksheet.format("G", {
-        "numberFormat": {"type": "CURRENCY"}
-    })
-
-    # Change Instance Cost Totals to Currency format
-    overview_worksheet.format("J", {
-        "numberFormat": {"type": "CURRENCY"}
-    })
-
-    # Set AWS Cost Totals to Currency
-    details_worksheet.format("C", {
-        "numberFormat": {"type": "CURRENCY"}
-    })
-
-    # Set AWS Region Totals to Currency
-    details_worksheet.format("G", {
-        "numberFormat": {"type": "CURRENCY"}
-    })
+    details_worksheet.batch_format(details_worksheet_formats)
 
     # Autosize first cols in Overview worksheet
     first_col = 0
@@ -1412,6 +1448,10 @@ def generate_bq_cur_sheets(spreadsheet, worksheet_names, data_source_ids):
 
     # Refresh all BQ Data sources (removes 'Apply' button from pivot tables)
     res = spreadsheet.batch_update(refresh_data_sources_body)
+
+    # Delete default worksheet
+    worksheet = spreadsheet.worksheet("Sheet1")
+    spreadsheet.del_worksheet(worksheet)
 
     overview_worksheet = spreadsheet.worksheet("AWS Overview")
     details_worksheet = spreadsheet.worksheet("AWS Details")
