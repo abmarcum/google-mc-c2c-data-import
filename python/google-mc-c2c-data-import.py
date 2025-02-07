@@ -1061,7 +1061,7 @@ def generate_mc_sheets(spreadsheet, worksheet_names, data_source_type, data_sour
                         "type": "CURRENCY"
                     },
             },
-        },{
+        }, {
             "range": "M",
             "format": {
                 "numberFormat":
@@ -1505,7 +1505,7 @@ def google_auth(service_account_key, scope):
 
 
 def import_mc_into_bq(mc_reports_directory, gcp_project_id, bq_dataset_name, bq_table_prefix, service_account_key,
-                      customer_name, display_looker, looker_template_id):
+                      customer_name):
     # GCP Scope for auth
     scope = [
         "https://www.googleapis.com/auth/drive",
@@ -1646,15 +1646,9 @@ def import_mc_into_bq(mc_reports_directory, gcp_project_id, bq_dataset_name, bq_
 
     print("Completed loading of Migration Center Data into Big Query.")
 
-    if display_looker is True:
-        looker_report_url = create_looker_url("MC", customer_name, datetime, gcp_project_id, bq_dataset_name,
-                                              bq_table_prefix)
-
-        print(f"Looker URL: {looker_report_url}")
-
 
 def import_cur_into_bq(mc_reports_directory, gcp_project_id, bq_dataset_name, bq_table, service_account_key,
-                       customer_name, display_looker, looker_template_id):
+                       customer_name):
     # GCP Scope for auth
     scope = [
         "https://www.googleapis.com/auth/drive",
@@ -1752,11 +1746,6 @@ def import_cur_into_bq(mc_reports_directory, gcp_project_id, bq_dataset_name, bq
 
     print("Completed loading of AWS CUR Data into Big Query.\n")
 
-    if display_looker is True:
-        looker_report_url = create_looker_url("CUR", customer_name, datetime, gcp_project_id, bq_dataset_name, bq_table)
-
-        print(f"Looker URL: {looker_report_url}")
-
 
 def create_looker_url(looker_template, customer_name, datetime, gcp_project_id, bq_dataset_name, bq_table):
     # Looker Settings
@@ -1822,7 +1811,6 @@ def main():
     enable_cur_import = args.a
     enable_bq_import = args.b
     mc_reports_directory = args.d
-    display_looker = args.l
     connect_sheets_bq = args.n
     sheets_emails = args.e
     do_not_import_data = args.o
@@ -1835,6 +1823,11 @@ def main():
             looker_template_id = default_mc_looker_template_id
         if args.a is True:
             looker_template_id = default_cur_looker_template_id
+
+    if args.l is True:
+        display_looker = "Yes"
+    else:
+        display_looker = "No"
 
     print(f"Migration Center C2C Data Import, {version}")
 
@@ -1930,7 +1923,7 @@ def main():
             if enable_bq_import is True and enable_cur_import is False:
                 print("Migration Center Data import...")
                 import_mc_into_bq(mc_reports_directory, gcp_project_id, bq_dataset_name, bq_table_prefix,
-                                  service_account_key, customer_name, display_looker, looker_template_id)
+                                  service_account_key, customer_name)
 
             if enable_bq_import is True and enable_cur_import is True:
                 print("Unable to import Migration Center & AWS CUR data at the same time. Please do each separately.")
@@ -1940,21 +1933,22 @@ def main():
                 print("AWS CUR import...")
                 import_cur_into_bq(mc_reports_directory, gcp_project_id, bq_dataset_name, bq_table_prefix,
                                    service_account_key,
-                                   customer_name, display_looker, looker_template_id)
+                                   customer_name)
 
         if do_not_import_data is True:
             if enable_bq_import is not True and enable_cur_import is not True:
                 print("Please specific whether to generate a Migration Center report (-b) or AWS CUR report (-a).")
                 exit()
 
-            if enable_bq_import is True:
+            if enable_bq_import is True and display_looker == "Yes":
                 looker_report_url = create_looker_url("MC", customer_name, datetime, gcp_project_id, bq_dataset_name,
                                                       bq_table_prefix)
-            elif enable_cur_import is True:
+                print(f"\nLooker URL: {looker_report_url}\n")
+
+            elif enable_cur_import is True and display_looker == "Yes":
                 looker_report_url = create_looker_url("CUR", customer_name, datetime, gcp_project_id, bq_dataset_name,
                                                       bq_table_prefix)
-
-            print(f"Looker URL: {looker_report_url}")
+                print(f"\nLooker URL: {looker_report_url}\n")
 
         if connect_sheets_bq is True:
             if sheets_emails is not None:
