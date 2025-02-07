@@ -606,7 +606,7 @@ def generate_mc_sheets(spreadsheet, worksheet_names, data_source_type, data_sour
         {
             'range': "G1",
             'values': [
-                ["GCP Discounts"]],
+                ["GCP Services Discounts"]],
         },
         {
             'range': "D2:E2",
@@ -619,12 +619,33 @@ def generate_mc_sheets(spreadsheet, worksheet_names, data_source_type, data_sour
                 ["GCP Total", "GCP Discount*", "GCP Discounted Price"]],
         },
         {
-            'range': "Q2",
+            'range': "R2",
             'values': [
                 ["* - Discount is only applied to Infra Cost"]],
+        },
+        {
+            'range': "O2:O4",
+            'values': [
+                ["GCP VM Total"], ["GCP VM Discount Total"], ["GCP VM Total w/ Discounts"]],
+        },
+        {
+            'range': "P2:P4",
+            'values': [
+                ["=SUM(C3:C)"], ["=(P2 - SUM(E3:E))"], ["=SUM(E3:E)"]],
+        },
+        {
+            'range': "O6:O8",
+            'values': [
+                ["GCP Services Total"], ["GCP Services Discount Total"], ["GCP Services Total w/ Discounts"]],
+        },
+        {
+            'range': "P6:P8",
+            'values': [
+                ["=SUM(K3:K)"], ["=(P6 - SUM(M3:M))"], ["=SUM(M3:M)"]],
         }
 
-    ]
+
+    ], value_input_option="USER_ENTERED"
     )
 
     # Add Cost sums to Overview Worksheet. Filter on GCP Cost column being greater than 0.
@@ -1187,11 +1208,28 @@ def generate_mc_sheets(spreadsheet, worksheet_names, data_source_type, data_sour
             },
         },
         {
-            "range": "Q2",
+            "range": "R2",
             "format": {
                 "textFormat": {
                     "italic": True,
                 },
+            },
+        },
+        {
+            "range": "O2:O",
+            "format": {
+                "textFormat": {
+                    "bold": True,
+                },
+            }
+        },
+        {
+            "range": "P",
+            "format": {
+                "numberFormat":
+                    {
+                        "type": "CURRENCY"
+                    },
             },
         },
     ]
