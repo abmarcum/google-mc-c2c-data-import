@@ -35,14 +35,14 @@
             "Warning_Messages": "STRING"
         },
         "unmapped": {
-            "identity_LineItemId": "STRING",
+            "identity_LineItemIds": "STRING",
             "lineItem_LineItemType": "STRING",
             "lineItem_ProductCode": "STRING",
             "lineItem_ProductName": "STRING",
             "lineItem_UsageType": "STRING",
             "lineItem_Operation": "STRING",
             "lineItem_ResourceId": "STRING",
-            "lineItem_UsageAmount": "STRING",
+            "lineItem_UsageAmount": "FLOAT64",
             "lineItem_CurrencyCode": "STRING",
             "lineItem_UnblendedRate": "FLOAT64",
             "lineItem_UnblendedCost": "FLOAT64",
@@ -51,14 +51,14 @@
             "ErrorMessage": "STRING"
         },
         "discount": {
-            "identity_LineItemId": "STRING",
+            "identity_LineItemIds": "STRING",
             "lineItem_LineItemType": "STRING",
             "lineItem_ProductCode": "STRING",
             "lineItem_ProductName": "STRING",
             "lineItem_UsageType": "STRING",
             "lineItem_Operation": "STRING",
             "lineItem_ResourceId": "STRING",
-            "lineItem_UsageAmount": "STRING",
+            "lineItem_UsageAmount": "FLOAT64",
             "lineItem_CurrencyCode": "STRING",
             "lineItem_UnblendedRate": "FLOAT64",
             "lineItem_UnblendedCost": "FLOAT64",
