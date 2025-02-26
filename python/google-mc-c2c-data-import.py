@@ -1678,6 +1678,16 @@ def import_mc_into_bq(mc_reports_directory, gcp_project_id, bq_dataset_name, bq_
                     "Ext. Memory (GB)": "External_Memory_GB"
                 }, inplace=True)
 
+            if file == 'unmapped':
+                mc_data[file].rename(columns={
+                    "identity_LineItemId": "identity_LineItemIds"
+                }, inplace=True)
+
+            if file == 'discount':
+                mc_data[file].rename(columns={
+                    "identity_LineItemId": "identity_LineItemIds"
+                }, inplace=True)
+
             # Ensure no spaces exist in any column names
             mc_data[file].rename(columns=lambda x: x.replace(" ", "_"), inplace=True)
 
