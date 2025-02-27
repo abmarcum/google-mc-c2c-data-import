@@ -517,7 +517,7 @@ def generate_mc_sheets(spreadsheet, worksheet_names, data_source_type, data_sour
     if data_source_type == "BQ":
         unmapped_data_column_formula = f"=SUM({unmapped_data_worksheet}!lineItem_UnblendedCost)"
     elif data_source_type == "SHEETS":
-        unmapped_data_column_formula = f"=SUM(\'{unmapped_data_worksheet}\'!K2:K)"
+        unmapped_data_column_formula = f"=SUM(\'{unmapped_data_worksheet}\'!L2:L)"
 
     exec_overview_worksheet.batch_update([
         {
@@ -747,8 +747,8 @@ def generate_mc_sheets(spreadsheet, worksheet_names, data_source_type, data_sour
     elif data_source_type == "SHEETS":
         data_source_id = [data_source["unmapped"]["worksheet_id"].id, data_source["unmapped"]["csv_header_length"],
                           data_source["unmapped"]["csv_num_rows"]]
-        data_row_col = 2  # Unmapped, Column C, lineItem_ProductCode
-        data_value_col = 10  # Unmapped, Column K, lineItem_UnblendedCost
+        data_row_col = 3  # Unmapped, Column D, lineItem_ProductCode
+        data_value_col = 11  # Unmapped, Column L, lineItem_UnblendedCost
 
     pivot_table_location = [
         0,  # Column D
@@ -770,9 +770,9 @@ def generate_mc_sheets(spreadsheet, worksheet_names, data_source_type, data_sour
     elif data_source_type == "SHEETS":
         data_source_id = [data_source["unmapped"]["worksheet_id"].id, data_source["unmapped"]["csv_header_length"],
                           data_source["unmapped"]["csv_num_rows"]]
-        data_row_col = 2  # Unmapped, Column C, lineItem_ProductCode
-        data_value_col = 10  # Unmapped, Column K, lineItem_UnblendedCost
-        data_row_col_2nd = 4  # Unmapped, Column E, lineItem_UsageType
+        data_row_col = 3  # Unmapped, Column D, lineItem_ProductCode
+        data_value_col = 11  # Unmapped, Column L, lineItem_UnblendedCost
+        data_row_col_2nd = 5  # Unmapped, Column F, lineItem_UsageType
 
     pivot_table_location = [
         3,  # Column D
@@ -869,19 +869,19 @@ def generate_mc_sheets(spreadsheet, worksheet_names, data_source_type, data_sour
     if data_source_type == "BQ":
         data_source_id = [data_source[0]]
         data_row_col = "GCP_Service"
-        data_row_col_2nd = "Sub_Type_1"
+        data_row_col_2nd = "Source_Shape"
         data_value_col = "OS_Licenses_Cost"
         data_value_col_2nd = "Infra_Cost"
 
-        filter_column = "Sub_Type_1"
+        filter_column = "GCP_Service"
     elif data_source_type == "SHEETS":
         data_source_id = [data_source["mapped"]["worksheet_id"].id, data_source["mapped"]["csv_header_length"],
                           data_source["mapped"]["csv_num_rows"]]
         data_row_col = 5  # Data, Column F, GCP_Service
-        data_row_col_2nd = 12  # Data, Column M, Sub_Type_1
+        data_row_col_2nd = 8  # Data, Column I, Source_Shape
         data_value_col = 22  # Data, Column W, OS_Licenses_Cost
         data_value_col_2nd = 21  # Data, Column V, Infra_Cost
-        filter_column = 5  # Data, Column F, Sub_Type_1
+        filter_column = 5  # Data, Column F, GCP_Service
 
     value_name = "License Cost"
     value_name_2nd = "Infra Cost"
@@ -1678,6 +1678,16 @@ def import_mc_into_bq(mc_reports_directory, gcp_project_id, bq_dataset_name, bq_
                     "Ext. Memory (GB)": "External_Memory_GB"
                 }, inplace=True)
 
+            if file == 'unmapped':
+                mc_data[file].rename(columns={
+                    "identity_LineItemId": "identity_LineItemIds"
+                }, inplace=True)
+
+            if file == 'discount':
+                mc_data[file].rename(columns={
+                    "identity_LineItemId": "identity_LineItemIds"
+                }, inplace=True)
+
             # Ensure no spaces exist in any column names
             mc_data[file].rename(columns=lambda x: x.replace(" ", "_"), inplace=True)
 
@@ -2018,15 +2028,15 @@ def main():
                 print("Please specific whether to generate a Migration Center report (-b) or AWS CUR report (-a).")
                 exit()
 
-            if enable_bq_import is True and display_looker == "Yes":
-                looker_report_url = create_looker_url("MC", customer_name, datetime, gcp_project_id, bq_dataset_name,
-                                                      bq_table_prefix)
-                print(f"\nLooker URL: {looker_report_url}\n")
+        if enable_bq_import is True and display_looker == "Yes":
+            looker_report_url = create_looker_url("MC", customer_name, datetime, gcp_project_id, bq_dataset_name,
+                                                  bq_table_prefix)
+            print(f"\nLooker URL: {looker_report_url}\n")
 
-            elif enable_cur_import is True and display_looker == "Yes":
-                looker_report_url = create_looker_url("CUR", customer_name, datetime, gcp_project_id, bq_dataset_name,
-                                                      bq_table_prefix)
-                print(f"\nLooker URL: {looker_report_url}\n")
+        elif enable_cur_import is True and display_looker == "Yes":
+            looker_report_url = create_looker_url("CUR", customer_name, datetime, gcp_project_id, bq_dataset_name,
+                                                  bq_table_prefix)
+            print(f"\nLooker URL: {looker_report_url}\n")
 
         if connect_sheets_bq is True:
             if sheets_emails is not None:
@@ -2076,7 +2086,7 @@ def main():
                         response['replies'][0]['addDataSource']['dataSource']['spec']['bigQuery']['tableSpec'][
                             'tableId']
 
-            pivot_table_location = [0, 0]
+            # pivot_table_location = [0, 0]
             if enable_bq_import is True:
                 generate_mc_sheets(spreadsheet, worksheet_names, "BQ", data_source_ids, unmapped_worksheet_name)
 
