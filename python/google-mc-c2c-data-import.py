@@ -515,7 +515,7 @@ def generate_mc_sheets(spreadsheet, worksheet_names, data_source_type, data_sour
     gcp_discounts_worksheet_id = gcp_discounts_worksheet._properties['sheetId']
 
     if data_source_type == "BQ":
-        unmapped_data_column_formula = f"=SUM({unmapped_data_worksheet}!lineItem_UnblendedCost)"
+        unmapped_data_column_formula = f"=SUM(\'{unmapped_data_worksheet}\'!lineItem_UnblendedCost)"
     elif data_source_type == "SHEETS":
         unmapped_data_column_formula = f"=SUM(\'{unmapped_data_worksheet}\'!L2:L)"
 
@@ -1680,12 +1680,12 @@ def import_mc_into_bq(mc_reports_directory, gcp_project_id, bq_dataset_name, bq_
 
             if file == 'unmapped':
                 mc_data[file].rename(columns={
-                    "identity_LineItemId": "identity_LineItemIds"
+                    "ID": "identity_LineItemIds"
                 }, inplace=True)
 
             if file == 'discount':
                 mc_data[file].rename(columns={
-                    "identity_LineItemId": "identity_LineItemIds"
+                    "ID": "identity_LineItemIds"
                 }, inplace=True)
 
             # Ensure no spaces exist in any column names
