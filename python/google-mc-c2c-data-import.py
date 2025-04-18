@@ -259,7 +259,7 @@ def generate_protect_sheet_request(sheet_id):
 # Create Pivot table with sums for Google Sheets
 def generate_pivot_table_request(source, data_source, row_col, value_col, location_spreadsheet,
                                  pivot_table_location, summarize_function, row_name, row_col_2nd, row_name_2nd,
-                                 value_name, value_col_2nd, value_name_2nd, filter_col, show_diff):
+                                 value_name, value_col_2nd, value_name_2nd, filter_col, show_diff, row_col_3rd, row_name_3rd):
     # Google Sheets Pivot Table API: https://developers.google.com/sheets/api/samples/pivot-tables
     f = open('settings.json', )
     template_file = json.load(f)
@@ -292,6 +292,21 @@ def generate_pivot_table_request(source, data_source, row_col, value_col, locati
                 "dataSourceColumnReference"] = {}
             new_pivot_table_request["requests"][0]["updateCells"]["rows"][0]["values"][0]["pivotTable"]["rows"][1][
                 "dataSourceColumnReference"]["name"] = row_col_2nd
+
+            if row_col_3rd is not None:
+                new_pivot_table_request["requests"][0]["updateCells"]["rows"][0]["values"][0]["pivotTable"][
+                    "rows"].append({})
+                new_pivot_table_request["requests"][0]["updateCells"]["rows"][0]["values"][0]["pivotTable"]["rows"][2][
+                    "showTotals"] = False
+                new_pivot_table_request["requests"][0]["updateCells"]["rows"][0]["values"][0]["pivotTable"]["rows"][2][
+                    "sortOrder"] = "DESCENDING"
+                new_pivot_table_request["requests"][0]["updateCells"]["rows"][0]["values"][0]["pivotTable"]["rows"][2][
+                    "valueBucket"] = {}
+                new_pivot_table_request["requests"][0]["updateCells"]["rows"][0]["values"][0]["pivotTable"]["rows"][2][
+                    "dataSourceColumnReference"] = {}
+                new_pivot_table_request["requests"][0]["updateCells"]["rows"][0]["values"][0]["pivotTable"]["rows"][2][
+                    "dataSourceColumnReference"]["name"] = row_col_3rd
+
         else:
             new_pivot_table_request["requests"][0]["updateCells"]["rows"][0]["values"][0]["pivotTable"]["rows"][0][
                 "dataSourceColumnReference"]["name"] = row_col
@@ -511,8 +526,20 @@ def generate_mc_sheets(spreadsheet, worksheet_names, data_source_type, data_sour
     unmapped_worksheet_id = unmapped_worksheet._properties['sheetId']
 
     # Create GCP Discounts Worksheet in Sheets
-    gcp_discounts_worksheet = spreadsheet.add_worksheet(gcp_discounts_worksheets_name, 60, 25)
+    gcp_discounts_worksheet = spreadsheet.add_worksheet(gcp_discounts_worksheets_name, 300, 25)
     gcp_discounts_worksheet_id = gcp_discounts_worksheet._properties['sheetId']
+
+    # Create Machine Type Overview Worksheet in Sheets
+    mt_overview_worksheet = spreadsheet.add_worksheet("Machine Type Overview", 300, 25)
+    mt_overview_worksheet_id = mt_overview_worksheet._properties['sheetId']
+
+    # Create Storage Overview Worksheet in Sheets
+    storage_overview_worksheet = spreadsheet.add_worksheet("Storage Overview", 60, 25)
+    storage_overview_worksheet_id = storage_overview_worksheet._properties['sheetId']
+
+    # Create DB Overview Worksheet in Sheets
+    db_overview_worksheet = spreadsheet.add_worksheet("Database Overview", 60, 25)
+    db_overview_worksheet_id = db_overview_worksheet._properties['sheetId']
 
     if data_source_type == "BQ":
         unmapped_data_column_formula = f"=SUM({unmapped_data_worksheet}!lineItem_UnblendedCost)"
@@ -587,11 +614,11 @@ def generate_mc_sheets(spreadsheet, worksheet_names, data_source_type, data_sour
                                                  "=IF(ISBLANK($C3), \"\", if($C3<=0,\"No Google Cost\",(1-$D3)*$C3))",
                                                  4,
                                                  2),
-            generate_repeat_cell_formula_request(gcp_discounts_worksheet_id, "=IF(ISBLANK($J3), \"\", $I3+$J3)", 10, 2),
-            generate_repeat_cell_formula_request(gcp_discounts_worksheet_id, "=IF(ISBLANK($J3), \"\", 0)", 11, 2),
+            generate_repeat_cell_formula_request(gcp_discounts_worksheet_id, "=IF(ISBLANK($K3), \"\", $J3+$K3)", 11, 2),
+            generate_repeat_cell_formula_request(gcp_discounts_worksheet_id, "=IF(ISBLANK($K3), \"\", 0)", 12, 2),
             generate_repeat_cell_formula_request(gcp_discounts_worksheet_id,
-                                                 "=IF(ISBLANK($J3), \"\", if($J3<=0,\"No Google Cost\",((1-$L3)*$J3)+$I3))",
-                                                 12,
+                                                 "=IF(ISBLANK($K3), \"\", if($K3<=0,\"No Google Cost\",((1-$M3)*$K3)+$J3))",
+                                                 13,
                                                  2)
         ]
     }
@@ -601,7 +628,7 @@ def generate_mc_sheets(spreadsheet, worksheet_names, data_source_type, data_sour
         {
             'range': "A1",
             'values': [
-                ["GCP VM Discounts"]],
+                ["GCP Machine Type Discounts"]],
         },
         {
             'range': "G1",
@@ -614,34 +641,34 @@ def generate_mc_sheets(spreadsheet, worksheet_names, data_source_type, data_sour
                 ["GCP Discount", "GCP Discounted Price"]],
         },
         {
-            'range': "K2:M2",
+            'range': "L2:N2",
             'values': [
                 ["GCP Total", "GCP Discount*", "GCP Discounted Price"]],
         },
         {
-            'range': "R2",
+            'range': "S2",
             'values': [
                 ["* - Discount is only applied to Infra Cost"]],
         },
         {
-            'range': "O2:O4",
-            'values': [
-                ["GCP VM Total"], ["GCP VM Discount Total"], ["GCP VM Total w/ Discounts"]],
-        },
-        {
             'range': "P2:P4",
             'values': [
-                ["=SUM(C3:C)"], ["=(P2 - SUM(E3:E))"], ["=SUM(E3:E)"]],
+                ["GCP Machine Type Total"], ["GCP Machine Type Discounted Total"], ["GCP Machine Type Total w/ Discounts"]],
         },
         {
-            'range': "O6:O8",
+            'range': "Q2:Q4",
             'values': [
-                ["GCP Services Total"], ["GCP Services Discount Total"], ["GCP Services Total w/ Discounts"]],
+                ["=SUM(C3:C)"], ["=(Q2 - SUM(E3:E))"], ["=SUM(E3:E)"]],
         },
         {
             'range': "P6:P8",
             'values': [
-                ["=SUM(K3:K)"], ["=(P6 - SUM(M3:M))"], ["=SUM(M3:M)"]],
+                ["GCP Services Total"], ["GCP Services Discounted Total"], ["GCP Services Total w/ Discounts"]],
+        },
+        {
+            'range': "Q6:Q8",
+            'values': [
+                ["=SUM(L3:L)"], ["=(Q6 - SUM(N3:N))"], ["=SUM(N3:N)"]],
         }
 
 
@@ -676,7 +703,7 @@ def generate_mc_sheets(spreadsheet, worksheet_names, data_source_type, data_sour
                                      gcp_overview_worksheet_id,
                                      pivot_table_location, "SUM", None, None, None, value_name,
                                      data_value_2nd_col,
-                                     value_name_2nd, filter_column, False
+                                     value_name_2nd, filter_column, False, None, None
                                      ),
 
     )
@@ -708,7 +735,7 @@ def generate_mc_sheets(spreadsheet, worksheet_names, data_source_type, data_sour
                                      gcp_overview_worksheet_id,
                                      pivot_table_location, "SUM", None, data_row_col_2nd, None, "GCP Cost", None, None,
                                      filter_column,
-                                     False
+                                     False, None, None
                                      ))
 
     # Add Instance Cost to Overview Worksheet. Filter on Destination_Shape column being not None.
@@ -736,7 +763,7 @@ def generate_mc_sheets(spreadsheet, worksheet_names, data_source_type, data_sour
         generate_pivot_table_request(data_source_type, data_source_id, data_row_col, data_value_col,
                                      gcp_overview_worksheet_id,
                                      pivot_table_location, "SUM", None, data_row_col_2nd, None, "GCP Cost", None, None,
-                                     filter_col, False
+                                     filter_col, False, None, None
                                      ))
 
     # Add Cost sums to AWS Unmapped Worksheet. Filter on AWS Cost column being greater than 0.
@@ -758,7 +785,7 @@ def generate_mc_sheets(spreadsheet, worksheet_names, data_source_type, data_sour
     response = spreadsheet.batch_update(
         generate_pivot_table_request(data_source_type, data_source_id, data_row_col, data_value_col,
                                      unmapped_worksheet_id,
-                                     pivot_table_location, "SUM", None, None, None, "AWS Cost", None, None, None, False
+                                     pivot_table_location, "SUM", None, None, None, "AWS Cost", None, None, None, False, None, None
                                      ))
 
     # Add Instance Region Usage Breakdown.
@@ -783,7 +810,7 @@ def generate_mc_sheets(spreadsheet, worksheet_names, data_source_type, data_sour
         generate_pivot_table_request(data_source_type, data_source_id, data_row_col, data_value_col,
                                      unmapped_worksheet_id,
                                      pivot_table_location, "SUM", None, data_row_col_2nd, None, "AWS Cost", None, None,
-                                     None, False
+                                     None, False, None, None
                                      ))
 
     # Exec Overview Pivot Table
@@ -823,7 +850,7 @@ def generate_mc_sheets(spreadsheet, worksheet_names, data_source_type, data_sour
                                      exec_overview_worksheet_id,
                                      pivot_table_location, "SUM", None, None, None, value_name,
                                      data_row_col_2nd,
-                                     value_name_2nd, filter_column, False
+                                     value_name_2nd, filter_column, False, None, None
                                      ),
 
     )
@@ -855,7 +882,7 @@ def generate_mc_sheets(spreadsheet, worksheet_names, data_source_type, data_sour
                                      gcp_discounts_worksheet_id,
                                      pivot_table_location, "SUM", None, data_row_col_2nd, None, value_name,
                                      None,
-                                     None, filter_column, False
+                                     None, filter_column, False, None, None
                                      ),
 
     )
@@ -870,6 +897,7 @@ def generate_mc_sheets(spreadsheet, worksheet_names, data_source_type, data_sour
         data_source_id = [data_source[0]]
         data_row_col = "GCP_Service"
         data_row_col_2nd = "Source_Shape"
+        data_row_col_3rd = "Destination_Shape"
         data_value_col = "OS_Licenses_Cost"
         data_value_col_2nd = "Infra_Cost"
 
@@ -879,6 +907,7 @@ def generate_mc_sheets(spreadsheet, worksheet_names, data_source_type, data_sour
                           data_source["mapped"]["csv_num_rows"]]
         data_row_col = 5  # Data, Column F, GCP_Service
         data_row_col_2nd = 8  # Data, Column I, Source_Shape
+        data_row_col_3rd = 10  # Data, Column K, Destination_Shape
         data_value_col = 22  # Data, Column W, OS_Licenses_Cost
         data_value_col_2nd = 21  # Data, Column V, Infra_Cost
         filter_column = 5  # Data, Column F, GCP_Service
@@ -890,7 +919,7 @@ def generate_mc_sheets(spreadsheet, worksheet_names, data_source_type, data_sour
         generate_pivot_table_request(data_source_type, data_source_id, data_row_col, data_value_col,
                                      gcp_discounts_worksheet_id,
                                      pivot_table_location, "SUM", None, data_row_col_2nd, None, value_name,
-                                     data_value_col_2nd, value_name_2nd, filter_column, False
+                                     data_value_col_2nd, value_name_2nd, filter_column, False, data_row_col_3rd, None
                                      ),
 
     )
@@ -1075,7 +1104,7 @@ def generate_mc_sheets(spreadsheet, worksheet_names, data_source_type, data_sour
             },
         },
         {
-            "range": "I",
+            "range": "J:K",
             "format": {
                 "numberFormat":
                     {
@@ -1083,7 +1112,7 @@ def generate_mc_sheets(spreadsheet, worksheet_names, data_source_type, data_sour
                     },
             },
         }, {
-            "range": "M",
+            "range": "N",
             "format": {
                 "numberFormat":
                     {
@@ -1144,7 +1173,7 @@ def generate_mc_sheets(spreadsheet, worksheet_names, data_source_type, data_sour
             },
         },
         {
-            "range": "K2:M2",
+            "range": "L2:N2",
             "format": {
                 "textFormat": {
                     "bold": True,
@@ -1180,7 +1209,7 @@ def generate_mc_sheets(spreadsheet, worksheet_names, data_source_type, data_sour
             },
         },
         {
-            "range": "I:K",
+            "range": "J:L",
             "format": {
                 "numberFormat":
                     {
@@ -1189,7 +1218,7 @@ def generate_mc_sheets(spreadsheet, worksheet_names, data_source_type, data_sour
             },
         },
         {
-            "range": "L",
+            "range": "M",
             "format": {
                 "numberFormat":
                     {
@@ -1199,7 +1228,7 @@ def generate_mc_sheets(spreadsheet, worksheet_names, data_source_type, data_sour
             },
         },
         {
-            "range": "M",
+            "range": "N",
             "format": {
                 "numberFormat":
                     {
@@ -1208,7 +1237,7 @@ def generate_mc_sheets(spreadsheet, worksheet_names, data_source_type, data_sour
             },
         },
         {
-            "range": "R2",
+            "range": "S2",
             "format": {
                 "textFormat": {
                     "italic": True,
@@ -1216,7 +1245,7 @@ def generate_mc_sheets(spreadsheet, worksheet_names, data_source_type, data_sour
             },
         },
         {
-            "range": "O2:O",
+            "range": "P2:P",
             "format": {
                 "textFormat": {
                     "bold": True,
@@ -1224,7 +1253,7 @@ def generate_mc_sheets(spreadsheet, worksheet_names, data_source_type, data_sour
             }
         },
         {
-            "range": "P",
+            "range": "Q",
             "format": {
                 "numberFormat":
                     {
@@ -1268,7 +1297,7 @@ def generate_mc_sheets(spreadsheet, worksheet_names, data_source_type, data_sour
 
     # Reorder Worksheets
     spreadsheet.reorder_worksheets(
-        [exec_overview_worksheet, gcp_overview_worksheet, unmapped_worksheet, gcp_discounts_worksheet])
+        [exec_overview_worksheet, gcp_overview_worksheet, unmapped_worksheet, gcp_discounts_worksheet, mt_overview_worksheet, storage_overview_worksheet, db_overview_worksheet])
 
 
 def generate_bq_cur_sheets(spreadsheet, worksheet_names, data_source_ids):
@@ -1296,7 +1325,7 @@ def generate_bq_cur_sheets(spreadsheet, worksheet_names, data_source_ids):
     response = spreadsheet.batch_update(
         generate_pivot_table_request(source, data_source, overview_row_col_name, overview_value_col_name,
                                      overview_worksheet_id,
-                                     pivot_table_location, "SUM", None, None, None, None, None, None, None, False
+                                     pivot_table_location, "SUM", None, None, None, None, None, None, None, False, None, None
                                      ))
 
     pivot_table_location = [
@@ -1310,7 +1339,7 @@ def generate_bq_cur_sheets(spreadsheet, worksheet_names, data_source_ids):
     response = spreadsheet.batch_update(
         generate_pivot_table_request(source, data_source, overview_row_col_name, overview_value_col_name,
                                      overview_worksheet_id,
-                                     pivot_table_location, "SUM", None, None, None, None, None, None, None, False
+                                     pivot_table_location, "SUM", None, None, None, None, None, None, None, False, None, None
                                      ))
 
     pivot_table_location = [
@@ -1325,7 +1354,7 @@ def generate_bq_cur_sheets(spreadsheet, worksheet_names, data_source_ids):
         generate_pivot_table_request(source, data_source, overview_row_col_name, overview_value_col_name,
                                      overview_worksheet_id,
                                      pivot_table_location, "SUM", None, None, None, None, None, None,
-                                     "product_instanceType", False
+                                     "product_instanceType", False, None, None
                                      ))
 
     pivot_table_location = [
@@ -1340,7 +1369,7 @@ def generate_bq_cur_sheets(spreadsheet, worksheet_names, data_source_ids):
         generate_pivot_table_request(source, data_source, details_row_col_name, details_value_col_name,
                                      details_worksheet_id,
                                      pivot_table_location, "SUM", None, "lineItem_UsageType", None, None, None, None,
-                                     None, False
+                                     None, False, None, None
                                      ))
 
     pivot_table_location = [
@@ -1355,7 +1384,7 @@ def generate_bq_cur_sheets(spreadsheet, worksheet_names, data_source_ids):
         generate_pivot_table_request(source, data_source, details_row_col_name, details_value_col_name,
                                      details_worksheet_id,
                                      pivot_table_location, "SUM", None, "product_instanceType", None, None, None, None,
-                                     None, False
+                                     None, False, None, None
                                      ))
 
     # Add Piechart for AWS Services
@@ -1504,7 +1533,7 @@ def import_mc_data_sheets(mc_reports_directory, spreadsheet, credentials):
     # Grabbing a list of files from the provided mc directory
     try:
         mc_file_list = os.listdir(mc_reports_directory)
-        print("Importing pricing report data...")
+        print("Importing MC pricing report data: ")
     except:
         print("Unable to access directory: " + mc_reports_directory)
         exit()
@@ -1534,9 +1563,10 @@ def import_mc_data_sheets(mc_reports_directory, spreadsheet, credentials):
                 exit()
 
             # Import Panda/CSV data into worksheet
-            worksheet = sh.add_worksheet(title=sheet_name, rows=100, cols=20)
+            print(f"\t{file}...")
+            # print(list(csv.reader(open(file_fullpath))))
+            worksheet = sh.add_worksheet(title=sheet_name, rows=100, cols=30)
             sh.values_update(
-                # file.rsplit(".csv"),
                 sheet_name,
                 params={'valueInputOption': 'USER_ENTERED'},
                 body={'values': list(csv.reader(open(file_fullpath)))})
