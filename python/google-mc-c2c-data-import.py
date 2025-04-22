@@ -630,7 +630,7 @@ def generate_pivot_table_request(source, data_source, row_col, value_col, locati
                         "values"][2]["name"] = value_name_3rd
 
                 new_pivot_table_request["requests"][0]["updateCells"]["rows"][0]["values"][0]["pivotTable"]["values"][
-                    2]["sourceColumnOffset"] = value_name_3rd
+                    2]["sourceColumnOffset"] = value_col_3rd
                 new_pivot_table_request["requests"][0]["updateCells"]["rows"][0]["values"][0]["pivotTable"]["values"][
                     2]["summarizeFunction"] = summarize_function
 
@@ -643,7 +643,7 @@ def generate_pivot_table_request(source, data_source, row_col, value_col, locati
                         "values"][3]["name"] = value_name_4th
 
                 new_pivot_table_request["requests"][0]["updateCells"]["rows"][0]["values"][0]["pivotTable"]["values"][
-                    3]["sourceColumnOffset"] = value_name_4th
+                    3]["sourceColumnOffset"] = value_col_4th
                 new_pivot_table_request["requests"][0]["updateCells"]["rows"][0]["values"][0]["pivotTable"]["values"][
                     3]["summarizeFunction"] = summarize_function
 
@@ -653,10 +653,10 @@ def generate_pivot_table_request(source, data_source, row_col, value_col, locati
 
                 if value_name_5th is not None:
                     new_pivot_table_request["requests"][0]["updateCells"]["rows"][0]["values"][0]["pivotTable"][
-                        "values"][43]["name"] = value_name_5th
+                        "values"][4]["name"] = value_name_5th
 
                 new_pivot_table_request["requests"][0]["updateCells"]["rows"][0]["values"][0]["pivotTable"]["values"][
-                    4]["sourceColumnOffset"] = value_name_5th
+                    4]["sourceColumnOffset"] = value_col_5th
                 new_pivot_table_request["requests"][0]["updateCells"]["rows"][0]["values"][0]["pivotTable"]["values"][
                     4]["summarizeFunction"] = summarize_function
 
@@ -1069,7 +1069,6 @@ def generate_mc_sheets(spreadsheet, worksheet_names, data_source_type, data_sour
     elif data_source_type == "SHEETS":
         data_source_id = [data_source["mapped"]["worksheet_id"].id, data_source["mapped"]["csv_header_length"],
                           data_source["mapped"]["csv_num_rows"]]
-
         data_row_col = 7  # Data, Column H, Region
         data_row_col_2nd = 8  # Data, Column I, Source_Shape
         data_row_col_3rd = 10  # Data, Column K, Destination_Shape
