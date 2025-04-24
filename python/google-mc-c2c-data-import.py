@@ -818,13 +818,13 @@ def generate_mc_sheets(spreadsheet, worksheet_names, data_source_type, data_sour
     # GCP % Discounts & GCP Discounted Price
     gcp_discounts_formula_json_request = {"requests":
         [
-            generate_repeat_cell_formula_request(gcp_discounts_worksheet_id, "=IF(ISBLANK($D3), \"\", $C3+$D3)", 4, 2),
-            generate_repeat_cell_formula_request(gcp_discounts_worksheet_id, "=IF(ISBLANK($D3), \"\", 0)", 5, 2),
+            generate_repeat_cell_formula_request(gcp_discounts_worksheet_id, "=IF(ISBLANK($E3), \"\", $D3+$E3)", 5, 2),
+            generate_repeat_cell_formula_request(gcp_discounts_worksheet_id, "=IF(ISBLANK($E3), \"\", 0)", 6, 2),
             generate_repeat_cell_formula_request(gcp_discounts_worksheet_id,
-                                                 "=IF(ISBLANK($D3), \"\", if($D3<=0,\"No Google Cost\",((1-$F3)*$D3)))",
-                                                 6,
+                                                 "=IF(ISBLANK($E3), \"\", if($E3<=0,\"No Google Cost\",((1-$G3)*$E3)))",
+                                                 7,
                                                  2),
-            generate_repeat_cell_formula_request(gcp_discounts_worksheet_id, "=IF(ISBLANK($D3), \"\", $C3 + $G3)", 7, 2),
+            generate_repeat_cell_formula_request(gcp_discounts_worksheet_id, "=IF(ISBLANK($E3), \"\", $D3 + $H3)", 8, 2),
 
         ]
     }
@@ -837,24 +837,24 @@ def generate_mc_sheets(spreadsheet, worksheet_names, data_source_type, data_sour
                 ["GCP Services Discounts"]],
         },
         {
-            'range': "E2:H2",
+            'range': "F2:I2",
             'values': [
                 ["GCP Total", "GCP Discount %", "GCP Discounted Price", "GCP Discounted Total"]],
         },
         {
-            'range': "M2",
+            'range': "N2",
             'values': [
                 ["* - Discount is only applied to Infra Cost"]],
         },
         {
-            'range': "J2:J4",
+            'range': "K2:K4",
             'values': [
                 ["GCP Services Total"], ["GCP Services Discounted Total"], ["GCP Services Total w/ Discounts"]],
         },
         {
-            'range': "K2:K4",
+            'range': "L2:L4",
             'values': [
-                ["=SUM(E3:E)"], ["=(SUM(D3:D) - SUM(G3:G))"], ["=SUM(G3:G) + SUM(C3:C)"]],
+                ["=SUM(F3:F)"], ["=(SUM(E3:E) - SUM(H3:H))"], ["=SUM(H3:H) + SUM(D3:D)"]],
         }
 
 
@@ -1071,6 +1071,7 @@ def generate_mc_sheets(spreadsheet, worksheet_names, data_source_type, data_sour
         data_source_id = [data_source[0]]
         data_row_col = "GCP_Service"
         data_row_col_2nd = "Destination_Series"
+        data_row_col_3rd = "Description"
         data_value_col = "OS_Licenses_Cost"
         data_value_col_2nd = "Infra_Cost"
 
@@ -1080,6 +1081,7 @@ def generate_mc_sheets(spreadsheet, worksheet_names, data_source_type, data_sour
                           data_source["mapped"]["csv_num_rows"]]
         data_row_col = 5  # Data, Column F, GCP_Service
         data_row_col_2nd = 8  # Data, Column I, Destination_Series
+        data_row_col_3rd = 6  # Data, Column G, Description
         data_value_col = 22  # Data, Column W, OS_Licenses_Cost
         data_value_col_2nd = 21  # Data, Column V, Infra_Cost
         filter_column = 5  # Data, Column F, GCP_Service
@@ -1091,7 +1093,7 @@ def generate_mc_sheets(spreadsheet, worksheet_names, data_source_type, data_sour
         generate_pivot_table_request(data_source_type, data_source_id, data_row_col, data_value_col,
                                      gcp_discounts_worksheet_id,
                                      pivot_table_location, "SUM", None, data_row_col_2nd, None, value_name,
-                                     data_value_col_2nd, value_name_2nd, filter_column, False, None, None, None, None, None, None, None, None, None, None, None, None, None, None
+                                     data_value_col_2nd, value_name_2nd, filter_column, False, data_row_col_3rd, None, None, None, None, None, None, None, None, None, None, None, None, None
                                      ),
 
     )
@@ -1385,7 +1387,7 @@ def generate_mc_sheets(spreadsheet, worksheet_names, data_source_type, data_sour
             },
         },
         {
-            "range": "E2:H2",
+            "range": "F2:I2",
             "format": {
                 "textFormat": {
                     "bold": True,
@@ -1393,7 +1395,7 @@ def generate_mc_sheets(spreadsheet, worksheet_names, data_source_type, data_sour
             },
         },
         {
-            "range": "C:E",
+            "range": "D:F",
             "format": {
                 "numberFormat":
                     {
@@ -1402,7 +1404,7 @@ def generate_mc_sheets(spreadsheet, worksheet_names, data_source_type, data_sour
             },
         },
         {
-            "range": "F",
+            "range": "G",
             "format": {
                 "numberFormat":
                     {
@@ -1412,7 +1414,7 @@ def generate_mc_sheets(spreadsheet, worksheet_names, data_source_type, data_sour
             },
         },
         {
-            "range": "G",
+            "range": "H",
             "format": {
                 "numberFormat":
                     {
@@ -1421,7 +1423,7 @@ def generate_mc_sheets(spreadsheet, worksheet_names, data_source_type, data_sour
             },
         },
         {
-            "range": "K",
+            "range": "L",
             "format": {
                 "numberFormat":
                     {
@@ -1430,7 +1432,7 @@ def generate_mc_sheets(spreadsheet, worksheet_names, data_source_type, data_sour
             },
         },
         {
-            "range": "J2:J4",
+            "range": "K2:K4",
             "format": {
                 "textFormat": {
                     "bold": True,
@@ -1438,7 +1440,7 @@ def generate_mc_sheets(spreadsheet, worksheet_names, data_source_type, data_sour
             },
         },
         {
-            "range": "M2",
+            "range": "N2",
             "format": {
                 "textFormat": {
                     "italic": True,
