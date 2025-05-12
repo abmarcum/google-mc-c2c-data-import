@@ -1821,11 +1821,6 @@ def google_auth(service_account_key, scope):
             print("Google Service account key: " + service_account_key + " does not appear to exist! Exiting...")
             exit()
     else:
-        if "GOOGLE_APPLICATION_CREDENTIALS" not in os.environ:
-            os.environ[
-                "GOOGLE_APPLICATION_CREDENTIALS"] = (os.path.expanduser(
-                '~' + username) + "/.config/gcloud/application_default_credentials.json")
-
         try:
             credentials, _ = google.auth.default(scopes=scope)
         except:
