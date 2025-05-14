@@ -63,7 +63,7 @@ If you need to save the data to Big Query, then you can authenticate using the f
 $ gcloud auth login
 $ gcloud config set project <PROJECT-ID>
 $ gcloud services enable bigquery.googleapis.com
-$ gcloud auth application-default login --scopes='https://www.googleapis.com/auth/drive','https://www.googleapis.com/auth/cloud-platform','https://www.googleapis.com/auth/bigquery.readonly'
+$ gcloud auth application-default login --scopes='https://www.googleapis.com/auth/drive','https://www.googleapis.com/auth/cloud-platform','https://www.googleapis.com/auth/bigquery'
 ```
 
 ---
