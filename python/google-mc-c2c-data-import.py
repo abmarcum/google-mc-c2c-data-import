@@ -796,9 +796,9 @@ def generate_mc_sheets(spreadsheet, worksheet_names, data_source_type, data_sour
     exec_overview_formula_json_request = {"requests":
         [
             generate_repeat_cell_formula_request(exec_overview_worksheet_id,
-                                                 "=IF(ISBLANK($E2), \"\", IF($E2=0, \"N/A\",$E2/$B$3))", 6,
+                                                 "=IF(ISBLANK($E2), \"\", IF($E2=0, \"N/A\", $E2/$B$3))", 6,
                                                  1),
-            generate_repeat_cell_formula_request(exec_overview_worksheet_id, "=IF(ISBLANK($E2), \"\", $F2-$E2)", 7,
+            generate_repeat_cell_formula_request(exec_overview_worksheet_id, "=IF(ISBLANK($E2), \"\", IF($E2=0, \"N/A\", $F2-$E2))", 7,
                                                  1),
             generate_repeat_cell_formula_request(exec_overview_worksheet_id,
                                                  "=IF(ISBLANK($E2), \"\", if($F2<=0,\"No Google Cost\",IF($E2=0, \"N/A\",($F2-$E2)/$E2)))",
@@ -994,68 +994,6 @@ def generate_mc_sheets(spreadsheet, worksheet_names, data_source_type, data_sour
                                      None, None, None, None
                                      ))
 
-    # Add Cost sums to AWS Unmapped Worksheet. Filter on AWS Cost column being greater than 0.
-    if data_source_type == "BQ":
-        data_source_id = [data_source[1]]
-        data_row_col = "lineItem_ProductCode"
-        data_value_col = "lineItem_UnblendedCost"
-        filter_col = "lineItem_ProductCode"
-    elif data_source_type == "SHEETS":
-        data_source_id = [data_source["unmapped"]["worksheet_id"].id, data_source["unmapped"]["csv_header_length"],
-                          data_source["unmapped"]["csv_num_rows"]]
-        data_row_col = 3  # Unmapped, Column D, lineItem_ProductCode
-        data_value_col = 11  # Unmapped, Column L, lineItem_UnblendedCost
-        filter_col = "lineItem_ProductCode"
-
-    pivot_table_location = [
-        0,  # Column D
-        0  # Row 1
-    ]
-
-    response = spreadsheet.batch_update(
-        generate_pivot_table_request(data_source_type, data_source_id, data_row_col, data_value_col,
-                                     unmapped_worksheet_id,
-                                     pivot_table_location, "SUM", None, None, None, "AWS Cost", None, None, filter_col, False,
-                                     None, None, None, None, None, None, None, None, None, None, None, None, None, None
-                                     ))
-
-    # Get AWS Total Spend
-    # aws_total_spend = unmapped_worksheet.acell('B2').value
-    aws_total_spend = gcp_overview_worksheet.get("B3")
-
-    # Add Instance Region Usage Breakdown.
-    if data_source_type == "BQ":
-        data_source_id = [data_source[1]]
-        data_row_col = "lineItem_ProductCode"
-        data_value_col = "lineItem_UnblendedCost"
-        data_row_col_2nd = "lineItem_UsageType"
-
-        if aws_total_spend == 0:
-            filter_col = "lineItem_ProductCode"
-
-    elif data_source_type == "SHEETS":
-        data_source_id = [data_source["unmapped"]["worksheet_id"].id, data_source["unmapped"]["csv_header_length"],
-                          data_source["unmapped"]["csv_num_rows"]]
-        data_row_col = 3  # Unmapped, Column D, lineItem_ProductCode
-        data_value_col = 11  # Unmapped, Column L, lineItem_UnblendedCost
-        data_row_col_2nd = 5  # Unmapped, Column F, lineItem_UsageType
-
-        if aws_total_spend == 0:
-            filter_col = "lineItem_ProductCode"
-
-    pivot_table_location = [
-        3,  # Column D
-        0  # Row 1
-    ]
-
-    response = spreadsheet.batch_update(
-        generate_pivot_table_request(data_source_type, data_source_id, data_row_col, data_value_col,
-                                     unmapped_worksheet_id,
-                                     pivot_table_location, "SUM", None, data_row_col_2nd, None, "AWS Cost", None, None,
-                                     filter_col, False, None, None, None, None, None, None, None, None, None, None, None,
-                                     None, None, None
-                                     ))
-
     # Exec Overview Pivot Table
     pivot_table_location = [
         3,  # Column D
@@ -1185,7 +1123,7 @@ def generate_mc_sheets(spreadsheet, worksheet_names, data_source_type, data_sour
     value_name_2nd = "AWS Cost"
     value_name_3rd = "Machine Type Cost"
     value_name_4th = "OS Licenses Cost"
-    value_name_5th = "GCP Cost"
+    value_name_5th = "Total GCP Cost"
 
     response = spreadsheet.batch_update(
         generate_pivot_table_request(data_source_type, data_source_id, data_row_col, data_value_col,
@@ -1199,6 +1137,9 @@ def generate_mc_sheets(spreadsheet, worksheet_names, data_source_type, data_sour
                                      ),
 
     )
+
+    # Refresh all BQ Data sources (removes 'Apply' button from pivot tables)
+    res = spreadsheet.batch_update(refresh_data_sources_body)
 
     # Add Piechart for GCP Cost Breakdown
     chart_title = "GCP Migration Breakdown"
@@ -1250,26 +1191,6 @@ def generate_mc_sheets(spreadsheet, worksheet_names, data_source_type, data_sour
 
     res = spreadsheet.batch_update(
         generate_pie_table_request(gcp_overview_worksheet_id, chart_title, piechart_row_col, piechart_value_col,
-                                   position_data))
-
-    # Add Piechart for AWS Unmapped Services
-    # from gspread.utils import ValueRenderOption
-    # aws_total_spend = exec_overview_worksheet.get("B3", value_render_option=ValueRenderOption.formula)
-
-    # aws_total_spend = unmapped_worksheet.acell('B2', value_render_option='UNFORMATTED_VALUE').value
-    # aws_total_spend = exec_overview_worksheet.acell('B2').value
-    # aws_total_spend = unmapped_worksheet.acell('B2').value
-
-    chart_title = "AWS Unmapped Services Breakdown"
-    piechart_row_col = 0
-    piechart_value_col = 1
-    position_data = [
-        7,  # Column H
-        0  # Row 1
-    ]
-
-    res = spreadsheet.batch_update(
-        generate_pie_table_request(unmapped_worksheet_id, chart_title, piechart_row_col, piechart_value_col,
                                    position_data))
 
     exec_overview_formats = [
@@ -1549,8 +1470,8 @@ def generate_mc_sheets(spreadsheet, worksheet_names, data_source_type, data_sour
     apply_conditional_color_rule(exec_overview_worksheet, "H:I", "NUMBER_LESS", "0", [0, 75, 0])
 
     # Set up conditional rules (Red/Green) to MT Overview Differences
-    apply_conditional_color_rule(mt_overview_worksheet, "K:L", "NUMBER_GREATER", "0", [1, 0, 0])
-    apply_conditional_color_rule(mt_overview_worksheet, "K:L", "NUMBER_LESS", "0", [0, 75, 0])
+    apply_conditional_color_rule(mt_overview_worksheet, "L:M", "NUMBER_GREATER", "0", [1, 0, 0])
+    apply_conditional_color_rule(mt_overview_worksheet, "L:M", "NUMBER_LESS", "0", [0, 75, 0])
 
     # Autosize first cols in Overview worksheet
     first_col = 0
@@ -1563,9 +1484,6 @@ def generate_mc_sheets(spreadsheet, worksheet_names, data_source_type, data_sour
     # Autosize first cols in Exec Overview worksheet
     res = spreadsheet.batch_update(autosize_worksheet(exec_overview_worksheet_id, first_col, last_col))
 
-    # Refresh all BQ Data sources (removes 'Apply' button from pivot tables)
-    res = spreadsheet.batch_update(refresh_data_sources_body)
-
     # Delete default worksheet
     worksheet = spreadsheet.worksheet("Sheet1")
     spreadsheet.del_worksheet(worksheet)
@@ -1574,6 +1492,97 @@ def generate_mc_sheets(spreadsheet, worksheet_names, data_source_type, data_sour
     spreadsheet.reorder_worksheets(
         [exec_overview_worksheet, gcp_overview_worksheet, unmapped_worksheet, gcp_discounts_worksheet,
          mt_overview_worksheet])  #, storage_overview_worksheet, db_overview_worksheet])
+
+    # Get AWS Unmapped Totals
+    from gspread.utils import ValueRenderOption
+    aws_total_spend_array = gcp_overview_worksheet.get("B3", value_render_option=ValueRenderOption.unformatted)
+    aws_total_spend = aws_total_spend_array[0]
+
+    # Add Cost sums to AWS Unmapped Worksheet. Filter on AWS Cost column being greater than 0.
+    if data_source_type == "BQ":
+        data_source_id = [data_source[1]]
+        data_row_col = "lineItem_ProductCode"
+        data_value_col = "lineItem_UnblendedCost"
+        if aws_total_spend[0] == 0:
+            filter_col = "lineItem_ProductCode"
+        else:
+            filter_col = None
+    elif data_source_type == "SHEETS":
+        data_source_id = [data_source["unmapped"]["worksheet_id"].id, data_source["unmapped"]["csv_header_length"],
+                          data_source["unmapped"]["csv_num_rows"]]
+        data_row_col = 3  # Unmapped, Column D, lineItem_ProductCode
+        data_value_col = 11  # Unmapped, Column L, lineItem_UnblendedCost
+        if aws_total_spend[0] == 0:
+            filter_col = "lineItem_ProductCode"
+        else:
+            filter_col = None
+
+    pivot_table_location = [
+        0,  # Column D
+        0  # Row 1
+    ]
+
+    response = spreadsheet.batch_update(
+        generate_pivot_table_request(data_source_type, data_source_id, data_row_col, data_value_col,
+                                     unmapped_worksheet_id,
+                                     pivot_table_location, "SUM", None, None, None, "AWS Cost", None, None, filter_col,
+                                     False,
+                                     None, None, None, None, None, None, None, None, None, None, None, None, None, None
+                                     ))
+
+    # Add Instance Region Usage Breakdown.
+    if data_source_type == "BQ":
+        data_source_id = [data_source[1]]
+        data_row_col = "lineItem_ProductCode"
+        data_value_col = "lineItem_UnblendedCost"
+        data_row_col_2nd = "lineItem_UsageType"
+
+        if aws_total_spend[0] == 0:
+            filter_col = "lineItem_ProductCode"
+        else:
+            filter_col = None
+
+    elif data_source_type == "SHEETS":
+        data_source_id = [data_source["unmapped"]["worksheet_id"].id, data_source["unmapped"]["csv_header_length"],
+                          data_source["unmapped"]["csv_num_rows"]]
+        data_row_col = 3  # Unmapped, Column D, lineItem_ProductCode
+        data_value_col = 11  # Unmapped, Column L, lineItem_UnblendedCost
+        data_row_col_2nd = 5  # Unmapped, Column F, lineItem_UsageType
+
+        if aws_total_spend[0] == 0:
+            filter_col = "lineItem_ProductCode"
+        else:
+            filter_col = None
+
+    pivot_table_location = [
+        3,  # Column D
+        0  # Row 1
+    ]
+
+    response = spreadsheet.batch_update(
+        generate_pivot_table_request(data_source_type, data_source_id, data_row_col, data_value_col,
+                                     unmapped_worksheet_id,
+                                     pivot_table_location, "SUM", None, data_row_col_2nd, None, "AWS Cost", None, None,
+                                     filter_col, False, None, None, None, None, None, None, None, None, None, None, None,
+                                     None, None, None
+                                     ))
+
+    # Add Piechart for AWS Unmapped Services
+    chart_title = "AWS Unmapped Services Breakdown"
+    piechart_row_col = 0
+    piechart_value_col = 1
+    position_data = [
+        7,  # Column H
+        0  # Row 1
+    ]
+
+    if aws_total_spend[0] > 0:
+        res = spreadsheet.batch_update(
+            generate_pie_table_request(unmapped_worksheet_id, chart_title, piechart_row_col, piechart_value_col,
+                                       position_data))
+
+    # Re-Refresh all BQ Data sources (removes 'Apply' button from pivot tables)
+    res = spreadsheet.batch_update(refresh_data_sources_body)
 
 
 def generate_bq_cur_sheets(spreadsheet, worksheet_names, data_source_ids):
