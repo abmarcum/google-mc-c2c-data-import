@@ -1513,7 +1513,7 @@ def generate_mc_sheets(spreadsheet, worksheet_names, data_source_type, data_sour
         data_row_col = 3  # Unmapped, Column D, lineItem_ProductCode
         data_value_col = 11  # Unmapped, Column L, lineItem_UnblendedCost
         if aws_total_spend[0] == 0:
-            filter_col = "lineItem_ProductCode"
+            filter_col = 3
         else:
             filter_col = None
 
@@ -1550,7 +1550,7 @@ def generate_mc_sheets(spreadsheet, worksheet_names, data_source_type, data_sour
         data_row_col_2nd = 5  # Unmapped, Column F, lineItem_UsageType
 
         if aws_total_spend[0] == 0:
-            filter_col = "lineItem_ProductCode"
+            filter_col = 3
         else:
             filter_col = None
 
@@ -1998,7 +1998,7 @@ def import_mc_into_bq(mc_reports_directory, gcp_project_id, bq_dataset_name, bq_
                     "ID": "identity_LineItemIds"
                 }, inplace=True)
 
-            if file == 'discount':
+            if file == 'credit-and-refund':
                 mc_data[file].rename(columns={
                     "ID": "identity_LineItemIds"
                 }, inplace=True)
